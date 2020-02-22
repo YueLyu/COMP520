@@ -1,0 +1,8 @@
+Yue Lyu
+260762354
+I searched online resources for how to write a compiler. I also discussed with my friend.
+
+IMPORTANT:
+1. Don't delete any files in src by hand, otherwise when running "build.sh", "make clean" will report file not found error.
+2. Run the compiler on given file:	./run.sh <mode> <file path>
+   It's users' responsibilities to provide correct directory information when running "./run.sh", otherwise an directory not exist error will be reported.
