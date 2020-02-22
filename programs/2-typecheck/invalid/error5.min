@@ -1,0 +1,4 @@
+# Declaration error: The variable a is declared twice, which is not allowed.
+
+var a : int = 9;
+var a : bool = False;

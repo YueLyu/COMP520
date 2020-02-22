@@ -1,0 +1,3 @@
+# Declaration and typechecking error: When declaring the variable x, it is not allowed to assign a float expression to an int variable.
+
+var x: int = 3.00;

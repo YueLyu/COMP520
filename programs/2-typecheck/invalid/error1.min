@@ -1,0 +1,6 @@
+# Typechecking error: The condition of a while loop shouldn't be in type int. A type bool is expected.
+var x: int = 9;
+while (12) {
+	x = x + 1;
+}
+

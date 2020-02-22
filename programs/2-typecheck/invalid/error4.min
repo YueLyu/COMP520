@@ -1,0 +1,7 @@
+# Declaration error: The variable b is declared inside the if branch, and its scope is within the if branch. The variable b outside if branch is not declared.
+var a : int = 0;
+if (True) {
+	var a : bool = False;
+	var b : int = 0;
+}
+b = 5;

@@ -1,0 +1,3 @@
+# Typechecking error: For the binary operator ==, <expr1> == <expr2>, <expr1> and <expr2> must either be the same type or some combination of int/float. Using == with a bool expression and int expression is not allowed.
+
+var x = True == 1;
