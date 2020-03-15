@@ -81,7 +81,7 @@ SYMBOL * makeSymbol_slice(char * name, SYMBOL * entrytype, Type * slicetype) {
 }
 
 //For structs and functions: makes a list of symbols for each field/parameter respectively
-SYMBOLLIST * makeSymbolList(Decl *funcParams) {
+SYMBOLLIST * makeSymbolList(SymbolTable* t, Decl *funcParams) {
 	SYMBOLLIST * list = malloc(sizeof(SYMBOLLIST));
 	SYMBOLLIST * head = list;
 	Decl * temp = funcParams;
@@ -95,8 +95,8 @@ SYMBOLLIST * makeSymbolList(Decl *funcParams) {
 					exit(1);
 				}
 				l = l->next;
-			}			
-
+			}
+			checkType(t, temp->val.func_params.identifier_type);
 			list->currSym = makeSymbol_var(curId->val.identifiers.identifier->val.identifier, temp->val.func_params.identifier_type, funcParams->lineno);
 			list->next = malloc(sizeof(SYMBOLLIST));
 			list = list->next;
@@ -261,6 +261,7 @@ void symDecl(Decl *n, SymbolTable* cur){
 						pos ++;
 					}
 				} else if (n->val.var_def.identifier_type != NULL && n->val.var_def.expressions != NULL) { // var x, y, z int = 1, 2, true
+					checkType(cur, n->val.var_def.identifier_type);
 					Type* type = n->val.var_def.identifier_type;
 					int len = 0;
 					Exp* temp_exp = n->val.var_def.expressions;
@@ -309,11 +310,14 @@ void symDecl(Decl *n, SymbolTable* cur){
 		    case k_NodeKindFuncDec:
 		    case k_NodeKindTypeDef:
 		    	//type check type definition
-		    	checkUnderling()
+		    	;
+		    	checkType(cur, n->val.type_def.identifier_type);
 		    	putSymbol(cur, makeSymbol_type(n->val.type_def.identifier->val.identifier, n->val.type_def.identifier_type, n->lineno));
 				break;
 		    case k_NodeKindFuncDec:
-		    	;
+		    	if(n->val.func_dec.func_type->val.func_type.identifier_type!=NULL){
+		    		checkType(cur, n->val.func_dec.func_type->val.func_type.identifier_type);
+		    	}
 		    	SYMBOLLIST* paramList = makeSymbolList(n->val.func_dec.func_params);
 		    	if (n->val.func_dec.func_type == NULL) {
 		    		putSymbol(cur, makeSymbol_function(n->val.func_dec.identifier->val.identifier, paramList, NULL, n->lineno));
@@ -332,21 +336,21 @@ void symDecl(Decl *n, SymbolTable* cur){
     }
 }
 
-void checkUnderlying(SymbolTable* t, Type* n){
+void checkType(SymbolTable* t, Type* n){
 	if (n!=NULL){
 		switch (n->kind){
 			case k_NodeKindArrayType:
 			case k_NodeKindSliceType:
 			case k_NodeKindParType:
 			case k_NodeKindStructType:
-				checkUnderlying(t, n->val.identifier_type.identifier_type);
+				checkType(t, n->val.identifier_type.identifier_type);
 				break;
 			case k_NodeKindIdType:
 				getSymbol(t, n->val.identifier);
 				break;
 			case k_NodeKindStructBody:
-				checkUnderlying(t, n->val.struct_body.struct_body);
-				checkUnderlying(t, n->val.struct_body.type);
+				checkType(t, n->val.struct_body.struct_body);
+				checkType(t, n->val.struct_body.type);
 				break;
 		}
 	}else{
@@ -388,6 +392,7 @@ void symStmt(Stmt *n, SymbolTable* cur, SYMBOLLIST *paramList){
 				symStmt(n->val.simple_statement_dec.statement,cur, NULL);
 				break;
 			case k_NodeKindSimpleStatementExp:
+				
 			case k_NodeKindSimpleStatementInc:
 			case k_NodeKindSimpleStatementDecrease:
 			case k_NodeKindSimpleStatementEqual:
@@ -402,10 +407,11 @@ void symStmt(Stmt *n, SymbolTable* cur, SYMBOLLIST *paramList){
 			case k_NodeKindSimpleStatementLeftShiftEqual:
 			case k_NodeKindSimpleStatementRightShiftEqual:
 			case k_NodeKindSimpleStatementBitClearEqual:
-			case k_NodeKindSimpleStatementDeclEqual:
 				symExp(n->val.simple_statement.lhs,cur);
 				if(n->val.simple_statement.rhs!=NULL){symExp(n->val.simple_statement.rhs,cur);}
 				break;
+			case k_NodeKindSimpleStatementDeclEqual:
+				//short hand declarations
 			
 			case k_NodeKindPrintDec:
 				symExp(n->val.print_dec.expression_opt,cur);
