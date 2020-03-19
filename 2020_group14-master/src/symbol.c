@@ -315,6 +315,13 @@ void symDecl(Decl *n, SymbolTable* cur){
 		    	putSymbol(cur, makeSymbol_type(n->val.type_def.identifier->val.identifier, n->val.type_def.identifier_type, n->lineno));
 				break;
 		    case k_NodeKindFuncDec:
+		    	//check for special functions
+		    	if(strcmp(n->val.func_dec.identifier->val.identifier, "main")==0||strcmp(n->val.func_dec.identifier->val.identifier, "main")==0){
+		    		if(n->val.func_dec.func_type!=NULL||n->val.func_dec.func_params!=NULL){
+		    			fprintf(stderr, "Error: (line %d) funcion init or main should have no parameters nor return value.\n", n->lineno);
+						exit(1);
+		    		}
+		    	}
 		    	if(n->val.func_dec.func_type->val.func_type.identifier_type!=NULL){
 		    		checkType(cur, n->val.func_dec.func_type->val.func_type.identifier_type);
 		    	}
@@ -392,7 +399,9 @@ void symStmt(Stmt *n, SymbolTable* cur, SYMBOLLIST *paramList){
 				symStmt(n->val.simple_statement_dec.statement,cur, NULL);
 				break;
 			case k_NodeKindSimpleStatementExp:
-				
+				symExp(n->val.simple_statement.lhs,cur);
+				break;
+			//TODO:
 			case k_NodeKindSimpleStatementInc:
 			case k_NodeKindSimpleStatementDecrease:
 			case k_NodeKindSimpleStatementEqual:

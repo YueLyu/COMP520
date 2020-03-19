@@ -6,10 +6,6 @@
 #include "tree.h"
 #include "type.h"
 
-
-
-SymbolTable *t; 
-SymbolTable *cur = t;
 TYPE * resolveType(SymbolTable * t, SYMBOL * sym) {
 	if (sym == NULL) {
 		fprintf(stderr, "Error: Trying to resolve type of NULL.");
@@ -101,8 +97,6 @@ TYPE * checkValidType(SymbolTable * t, TYPE * type, int lineno){
 	return type;
 }
 
-
-
 bool compareType(Type* a, Type* b) {//A very good method
 	if (a == NULL && b == NULL) {
 		return true;
@@ -169,196 +163,7 @@ bool compareIdList(Exp *ids1,Exp *ids2){
 	
 }
 
-void typecheck_prog(SymbolTable *t, Prog* root){
-	typecheck_Decl(t, root->top_decs);
-}
-
-void typecheck_Decl(SymbolTable* t, Decl* n){
-	if(n!=NULL){
-		switch(n->kind){
-			k_NodeKindPackageDec:
-				break;
-			k_NodeKindTopDecs:
-				typecheck_Decl(SymbolTable* t, n->val.top_decs.top_decs);
-				typecheck_Decl(SymbolTable* t, n->val.top_decs.top_dec);
-				break;
-			k_NodeKindVarDecLine:
-			k_NodeKindVarDecPar:
-				typecheck_Decl(SymbolTable* t, n->val.var_dec.def);
-			k_NodeKindVarDefs:
-				typecheck_Decl(SymbolTable* t, n->val.var_defs.var_defs);
-				typecheck_Decl(SymbolTable* t, n->val.var_defs.var_def);
-				break;
-			k_NodeKindVarDef:
-				if (n->val.var_def.identifier_type == NULL) { // var x, y, z = 1, 2, 3
-					int len = 0;
-					Exp* temp_exp = n->val.var_def.expressions;
-					while (temp_exp != NULL) {
-						len ++;
-						temp_exp = temp_exp->val.expressions.expressions;
-					}
-					Type* arr [len]; 
-					int pos = 0;
-					temp_exp = n->val.var_def.expressions;
-					while (temp_exp != NULL) {
-						arr[pos] = inferType_Exp(t, temp_exp->val.expressions.expression);
-						temp_exp = temp_exp->val.expressions.expressions;
-						pos ++;
-					}
-					for (int i = 0; i < len - 1; i ++) {
-						if (!compareType(arr[i], arr[i + 1])) {
-							fprintf(stderr, "Error: (line %d) The types of expressions in the variable declaration doesn't match.\n", n->lineno);
-							exit(1);
-						}
-					}
-					Exp* temp_id = n->val.var_def.identifiers;
-					while (temp_id != NULL) {
-						temp_id->val.identifiers.identifier->sym->typelit.type = arr[0];
-						temp_id = temp_id->val.identifiers.identifiers;
-					}
-				} else if (n->val.var_def.identifier_type != NULL && n->val.var_def.expressions != NULL) { // var x, y, z int = 1, 2, true
-					Type* type = n->val.var_def.identifier_type;
-					int len = 0;
-					Exp* temp_exp = n->val.var_def.expressions;
-					while (temp_exp != NULL) {
-						len ++;
-						temp_exp = temp_exp->val.expressions.expressions;
-					}
-					Type* arr [len]; 
-					int pos = 0;
-					temp_exp = n->val.var_def.expressions;
-					while (temp_exp != NULL) {
-						arr[pos] = inferType_Exp(t, temp_exp->val.expressions.expression);
-						temp_exp = temp_exp->val.expressions.expressions;
-						pos ++;
-					}
-					for (int i = 0; i < len; i ++) {
-						if (!compareType(arr[i], type)) {
-							fprintf(stderr, "Error: (line %d) The types of expressions in the variable declaration doesn't match.\n", n->lineno);
-							exit(1);
-						}
-					}
-					Exp* temp_id = n->val.var_def.identifiers;
-					while (temp_id != NULL) {
-						temp_id->val.identifiers.identifier->sym->typelit.type = arr[0];
-						temp_id = temp_id->val.identifiers.identifiers;
-					}
-				}
-				
-				
-				break;
-			k_NodeKindTypeDecPar:
-			k_NodeKindTypeDecLine:
-			k_NodeKindTypeDefs:
-			k_NodeKindTypeDef:
-				break;
-			k_NodeKindFuncDec:
-				typecheck_Stmt(SymbolTable* t, n->val.func_dec.block_body);
-				break;
-			k_NodeKindFuncParams:
-			k_NodeKindFuncType:
-				break;
-				
-		}
-	}
-}
-
-void checkVarDef(Exp* id, Exp* exp){
-	
-}
-
-void typecheck_Stmt(SymbolTable* t, Stmt* n){
-	if(n!=NULL){
-		switch(n.kind){
-			k_NodeKindStatements:
-				typecheck_Stmt(SymbolTable* t, n->val.statements.statements);
-				typecheck_Stmt(SymbolTable* t, n->val.statements.statement);
-				break;
-			k_NodeKindStatement:
-				typecheck_Stmt(SymbolTable* t, n->val.statements.statement);
-				break;
-			k_NodeKindStatementDec:
-				typecheck_Decl(SymbolTable* t, n->val.statement_dec.decl);
-				break;
-			k_NodeKindBlockBody:
-				typecheck_Stmt(SymbolTable* t, n->val.block_body.statements);
-				break;
-			k_NodeKindSimpleStatementDec:
-				typecheck_Stmt(SymbolTable* t, n->val.simple_statement_dec.statement);
-				break;
-			k_NodeKindSimpleStatementExp,
-			k_NodeKindSimpleStatementInc,
-			k_NodeKindSimpleStatementDecrease,
-			k_NodeKindSimpleStatementEqual,
-			k_NodeKindSimpleStatementPlusEqual,
-			k_NodeKindSimpleStatementMinEqual,
-			k_NodeKindSimpleStatementMulEqual,
-			k_NodeKindSimpleStatementDivEqual,
-			k_NodeKindSimpleStatementModEqual,
-			k_NodeKindSimpleStatementBitAndEqual,
-			k_NodeKindSimpleStatementBitOrEqual,
-			k_NodeKindSimpleStatementBitXorEqual,
-			k_NodeKindSimpleStatementLeftShiftEqual,
-			k_NodeKindSimpleStatementRightShiftEqual,
-			k_NodeKindSimpleStatementBitClearEqual,
-			k_NodeKindSimpleStatementDeclEqual,
-				Type *varType=typecheck_Exp(SymbolTable* t, n->val.simple_statement.lhs);
-				Type *expType=typecheck_Exp(SymbolTable* t, n->val.simple_statement.rhs);
-				if(varType==NULL||expType==NULL||strcmp(getType(varType),getType(expType))!=0){fprintf(stderr, "Declaration Error: variable and expressions not the same type\n";}//check assignability
-				
-				break;
-			k_NodeKindPrintDec:
-			k_NodeKindPrintlnDec:
-				typecheck_Exp(SymbolTable* t, n->val.print_dec.expression_opt);
-				break;
-			k_NodeKindReturn:
-				typecheck_Exp(SymbolTable* t, n->val.return_dec.expression_opt);
-				break;
-			k_NodeKindIfStmt:
-				typecheck_Stmt(SymbolTable* t, n->val.if_stmt.simple_statement_dec);
-				Type *ifCondition=typecheck_Exp(SymbolTable* t, n->val.if_stmt.expression);
-				if(strcmp(getType(ifCondition),"bool")!=0){fprintf(stderr,"If condition not bool");}
-				typecheck_Stmt(SymbolTable* t, n->val.if_stmt.block_body);
-				typecheck_Stmt(SymbolTable* t, n->val.if_stmt.else_stmt);
-				break;
-			k_NodeKindElseStmt:
-				typecheck_Stmt(SymbolTable* t, n->val.else_stmt.if_stmt);
-				typecheck_Stmt(SymbolTable* t, n->val.else_stmt.block_body);
-				break;
-			k_NodeKindForDec:
-				typecheck_Stmt(SymbolTable* t, n->val.for_dec.for_condition);
-				typecheck_Stmt(SymbolTable* t, n->val.for_dec.block_body);
-				break;
-			k_NodeKindForCondition:
-				typecheck_Stmt(SymbolTable* t, n->val.for_condition.left);
-				Type *forCondition=typecheck_Exp(SymbolTable* t, n->val.for_condition.expression);
-				if(strcmp(getType(forCondition),"bool")!=0){fprintf(stderr,"For condition not bool");}
-				typecheck_Stmt(SymbolTable* t, n->val.for_condition.right);
-				break;
-			k_NodeKindSwitchDec:
-				typecheck_Stmt(SymbolTable* t, n->val.switch_dec.switch_def);
-				typecheck_Stmt(SymbolTable* t, n->val.switch_dec.switch_cases);
-				break;
-			k_NodeKindSwitchDef:
-				typecheck_Stmt(SymbolTable* t, n->val.switch_def.simple_statement);
-				Type *switchExpType=typecheck_Exp(SymbolTable* t, n->val.switch_def.expression_opt);
-				break;
-			k_NodeKindSwitchCases:
-			k_NodeKindDefault:
-				typecheck_Stmt(SymbolTable* t, n->val.switch_cases.cases);
-				Type *caseExpType=typecheck_Exp(SymbolTable* t, n->val.switch_cases.expressions);
-				if(strcmp(getType(switchExpType),getType(caseExpType))!=0){fprintf(stderr,"case expr doesn't match switch expr");}
-				typecheck_Stmt(SymbolTable* t, n->val.switch_cases.statements);
-				break;
-			
-			k_NodeKindBreak:
-			k_NodeKindContinue:
-				break;
-		}
-	}
-}
-
-Type *inferType_Exp(SymbolTable* t, Exp* n){
+Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 	if(n!=NULL){
 		switch(n->kind){
 			k_NodeKindIdentifiers:
@@ -413,6 +218,7 @@ Type *inferType_Exp(SymbolTable* t, Exp* n){
 			k_NodeKindFuncCall,
 		}
 	}
+	return ;
 }
 
 
