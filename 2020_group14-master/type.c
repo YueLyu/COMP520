@@ -167,62 +167,244 @@ Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 	if(n!=NULL){
 		switch(n->kind){
 			k_NodeKindIdentifiers:
-				typecheck_Exp(SymbolTable* t, n->val.identifiers.identifiers);
-				typecheck_Exp(SymbolTable* t, n->val.identifiers.identifier);
 				break;
-			k_NodeKindIdentifier,
-				typecheck_Exp()
-				break;
-			k_NodeKindExpressions,
-			k_NodeKindExpressionOpt,
-			k_NodeKindExpressionsOpt,
-			k_NodeKindExpression,
+				
+			k_NodeKindIdentifier:// 		TODO: doesn't support _ (blank identifier)
+				SYMBOL* symbol = getSymbol(t, n->val.identifier);
+				Type* inferred_type = symbol->typelit.type;
+				n->type = inferred_type;
+				return inferred_type;
+				
+			k_NodeKindExpressions:
+			k_NodeKindExpressionsOpt:
+				
+			k_NodeKindExpressionOpt:
+			k_NodeKindExpression:
+				return inferType_Exp(t, n->val.expression.expression);
+				
+			/* --------------------------- Binary expressions: ---------------------------*/
+			k_NodeKindExpressionBinaryPlus:		// +
+				Type* lhs = inferType_Exp(t, n->val.binary.lhs);
+				Type* rhs = inferType_Exp(t, n->val.binary.rhs);
+				if (isNumeric(lhs) && isNumeric(rhs)) {
+					if (lhs->inferType == Float64Type || rhs->inferType == Float64Type) {
+						Type* inferred_type = newIdType("float64", n->lineno);
+						inferred_type->inferType = Float64Type;
+						n->type = inferred_type;
+						return inferred_type;
+					} else {
+						Type* inferred_type = newIdType("int", n->lineno);
+						inferred_type->inferType = IntType;
+						n->type = inferred_type;
+						return inferred_type;
+					}
+				} else if (lhs->inferType == StringType && rhs->inferType == StringType) {
+					Type* inferred_type = newIdType("string", n->lineno);
+					inferred_type->inferType = StringType;
+					n->type = inferred_type;
+					return inferred_type;
+				} else {
+					fprintf(stderr, "Error: (line %d) The operands in binary expression don't type check.", n->lineno);
+					exit(1);
+				}
+					
+			k_NodeKindExpressionBinaryMinus:	// -
+			k_NodeKindExpressionBinaryMultiply:		// *
+			k_NodeKindExpressionBinaryDivide:	// /		
+				Type* lhs = inferType_Exp(t, n->val.binary.lhs);
+				Type* rhs = inferType_Exp(t, n->val.binary.rhs);
+				if (isNumeric(lhs) && isNumeric(rhs)) {
+					if (lhs->inferType == Float64Type || rhs->inferType == Float64Type) {
+						Type* inferred_type = newIdType("float64", n->lineno);
+						inferred_type->inferType = Float64Type;
+						n->type = inferred_type;
+						return inferred_type;
+					} else {
+						Type* inferred_type = newIdType("int", n->lineno);
+						inferred_type->inferType = IntType;
+						n->type = inferred_type;
+						return inferred_type;
+					}
+				} else {
+					fprintf(stderr, "Error: (line %d) The operands in binary expression don't type check.", n->lineno);
+					exit(1);
+				}
+					
+			k_NodeKindExpressionBinaryModulo:	// %
+			k_NodeKindExpressionBinaryBitAnd:	// &
+			k_NodeKindExpressionBinaryBitOr:	// |
+			k_NodeKindExpressionBinaryBitXor:	// ^
+			k_NodeKindExpressionBinarybitClear:		  // &^
+			k_NodeKindExpressionBinaryLeftShift:	//  <<
+			k_NodeKindExpressionBinaryRightShift:	// >>
+				Type* lhs = inferType_Exp(t, n->val.binary.lhs);
+				Type* rhs = inferType_Exp(t, n->val.binary.rhs);
+				if (isInteger(lhs) && isInteger(rhs)) {
+					Type* inferred_type = newIdType("int", n->lineno);
+					inferred_type->inferType = IntType;
+					n->type = inferred_type;
+					return inferred_type;
+				} else {
+					fprintf(stderr, "Error: (line %d) The operands in binary expression don't type check.", n->lineno);
+					exit(1);
+				}
+				
+			k_NodeKindExpressionBinaryIsEqual:	// ==
+			k_NodeKindExpressionBinaryIsNotEqual:	// !=		
+				Type* lhs = inferType_Exp(t, n->val.binary.lhs);
+				Type* rhs = inferType_Exp(t, n->val.binary.rhs);
+				if (isComparable(lhs) && isComparable(rhs)) {
+					Type* inferred_type = newIdType("bool", n->lineno);
+					inferred_type->inferType = BoolType;
+					n->type = inferred_type;
+					return inferred_type;
+				} else {
+					fprintf(stderr, "Error: (line %d) The operands in binary expression don't type check.", n->lineno);
+					exit(1);
+				}
+				
+			k_NodeKindExpressionBinaryLessThan:		// <
+			k_NodeKindExpressionBinaryGreaterThan:		// >
+			k_NodeKindExpressionBinaryLessThanEqual:	// <=
+			k_NodeKindExpressionBinaryGreaterThanEqual:		// >=	
+				Type* lhs = inferType_Exp(t, n->val.binary.lhs);
+				Type* rhs = inferType_Exp(t, n->val.binary.rhs);
+				if (isOrdered(lhs) && isOrdered(rhs)) {
+					Type* inferred_type = newIdType("bool", n->lineno);
+					inferred_type->inferType = BoolType;
+					n->type = inferred_type;
+					return inferred_type;
+				} else {
+					fprintf(stderr, "Error: (line %d) The operands in binary expression don't type check.", n->lineno);
+					exit(1);
+				}
+				
+			k_NodeKindExpressionBinaryAnd:		// ||		bool || bool = bool
+			k_NodeKindExpressionBinaryOr:		// &&		bool && bool = bool
+				Type* lhs = inferType_Exp(t, n->val.binary.lhs);
+				Type* rhs = inferType_Exp(t, n->val.binary.rhs);
+				if (lhs->inferType == BoolType && rhs->inferType == BoolType) {
+					n->type = lhs;
+					return lhs;
+				} else {
+					fprintf(stderr, "Error: (line %d) The operands in binary expression don't type check.", n->lineno);
+					exit(1);
+				}
 			
-			k_NodeKindExpressionBinaryPlus,
-			k_NodeKindExpressionBinaryMinus,
-			k_NodeKindExpressionBinaryMultiply,
-			k_NodeKindExpressionBinaryDivide,
-			k_NodeKindExpressionBinaryModulo,
-			k_NodeKindExpressionBinaryBitAnd,
-			k_NodeKindExpressionBinaryBitOr,
-			k_NodeKindExpressionBinaryBitXor,
-			k_NodeKindExpressionBinarybitClear,
-			k_NodeKindExpressionBinaryLeftShift,
-			k_NodeKindExpressionBinaryRightShift,
-			k_NodeKindExpressionBinaryIsEqual,
-			k_NodeKindExpressionBinaryIsNotEqual,
-			k_NodeKindExpressionBinaryLessThan,
-			k_NodeKindExpressionBinaryGreaterThan,
-			k_NodeKindExpressionBinaryLessThanEqual,
-			k_NodeKindExpressionBinaryGreaterThanEqual,
-			k_NodeKindExpressionBinaryAnd,
-			k_NodeKindExpressionBinaryOr,
+			/* --------------------------- Unary expressions: ---------------------------*/
+			k_NodeKindUMinus:
+			k_NodeKindUPlus:	// -, + : numeric type
+				Type* operand_type = inferType_Exp(t, n->val.unary.operand);
+				if(operand_type->inferType == IntType
+					|| operand_type->inferType == Float64Type
+				 	|| operand_type->inferType == RuneType) {
+					n->type = operand_type;
+					return operand_type;
+				} else {
+					fprintf(stderr, "Error: (line %d) The operand in unary expression doesn't type check.", n->lineno);
+					exit(1);
+				}
+			k_NodeKindUNot:		// ! : bool type
+				Type* operand_type = inferType_Exp(t, n->val.unary.operand);
+				if(operand_type->inferType == BoolType) {
+					n->type = operand_type;
+					return operand_type;
+				} else {
+					fprintf(stderr, "Error: (line %d) The operand in unary expression doesn't type check.", n->lineno);
+					exit(1);
+				}
+			k_NodeKindUXor:		// ^ : int, rune
+				Type* operand_type = inferType_Exp(t, n->val.unary.operand);
+				if(operand_type->inferType == IntType
+					|| operand_type->inferType == RuneType) {
+					n->type = operand_type;
+					return operand_type;
+				} else {
+					fprintf(stderr, "Error: (line %d) The operand in unary expression doesn't type check.", n->lineno);
+					exit(1);
+				}
 			
-			k_NodeKindUMinus,
-			k_NodeKindUPlus,
-			k_NodeKindUNot,
-			k_NodeKindUXor,
-			
-			k_NodeKindIntLiteral,
-			k_NodeKindRuneLiteral,
-			k_NodeKindFloatLiteral,
-			k_NodeKindStringLiteral,
-			
-			k_NodeKindExpressionPrimary,
-			k_NodeKindSelector,
-			k_NodeKindIndex,
-			
-			k_NodeKindAppend,
-			k_NodeKindLen,
-			k_NodeKindCap,
-			k_NodeKindFuncCall,
+			/* --------------------------- Literals: ---------------------------*/
+			k_NodeKindIntLiteral:
+				Type* inferred_type = newIdType("int", n->lineno);
+				inferred_type->inferType = IntType;
+				n->type = inferred_type
+				return inferred_type;
+			k_NodeKindRuneLiteral:
+				Type* inferred_type = newIdType("rune", n->lineno);
+				inferred_type->inferType = RuneType;
+				n->type = inferred_type
+				return inferred_type;
+			k_NodeKindFloatLiteral:
+				Type* inferred_type = newIdType("float64", n->lineno);
+				inferred_type->inferType = Float64Type;
+				n->type = inferred_type
+				return inferred_type;
+			k_NodeKindStringLiteral:
+				Type* inferred_type = newIdType("string", n->lineno);
+				inferred_type->inferType = StringType;
+				n->type = inferred_type
+				return inferred_type;
+			k_NodeKindExpressionPrimary:
+				
+			k_NodeKindSelector:
+			k_NodeKindIndex:
+				
+			k_NodeKindAppend://append []T T = []T
+				return 
+			k_NodeKindLen://len []T/[N]T = int
+				return 
+			k_NodeKindCap://cap []T/[N]T = int
+				return 
+			k_NodeKindFuncCall://check func_type
+				return 
 		}
 	}
-	return ;
+	return NULL;
 }
 
+// Find the underlying type 
+resolveType(SymbolTable* t, Type* type) {
+	
+} 
 
 
+bool isNumeric(Type* type) {
+	return type->inferType == IntType || type->inferType == Float64Type
+		|| type->inferType == RuneType;
+}
 
+bool isInteger(Type* type) {
+	return type->inferType == IntType || type->inferType == RuneType;
+}
+/*	TODO: not sure what is pointer???
+	comparable type: bool, int, float64, string, pointer, 
+					 struct(if all their fields are comparable), 
+					 array(if values of array element type are comparable)
+*/
+bool isComparable(Type* type) {
+	if (type == NULL) {
+		return true;
+	}
+	if (type->inferType == BoolType || type->inferType == IntType 
+		|| type->inferType == Float64Type
+		|| type->inferType == StringType) {
+		return true;
+	} else if (type->inferType == StructType) {
+		return isComparable(type->val.identifier_type.identifier_type);
+	} else if (type->inferType == ArrayType) {
+		return isComparable(type->val.identifier_type.identifier_type);
+	} else if (type->inferType == UnknownType && type->kind == k_NodeKindStructBody) {
+		return isComparable(type->val.struct_body.type) 
+			&& isComparable(type->val.struct_body.struct_body);
+	} else {
+		return false;
+	}
+}
+/*  ordered type: int, float64, string  */
+bool isOrdered(Type* type) {
+	return type->inferType == IntType || type->inferType == Float64Type
+		|| type->inferType == StringType;
+}
 
 
