@@ -58,6 +58,7 @@ void yyerror(const char *s) {
 %type <exp>    	expression
 %type <exp>   	expressions
 %type <exp>   	primary_expression
+%type <exp>		primary_expressions
 %type <exp>		selector
 %type <exp>		index
 %type <exp>		func_call
@@ -1058,7 +1059,7 @@ primary_expressions[root]
         }
     | primary_expression[exp]
         {
-            $root = newExpressionsPrimary(NULL, $exp, @exps.first_line);
+            $root = newExpressionsPrimary(NULL, $exp, @exp.first_line);
         }
     ;
 	

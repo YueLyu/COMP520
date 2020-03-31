@@ -192,12 +192,12 @@ Stmt *newSimpleStatement(Exp *lhs, Exp *rhs, StmtKind kind, int lineno){
 }
 Stmt *newPrintStatement(Exp *expression_opt, StmtKind kind, int lineno){
 	Stmt *n = newStmt(kind, lineno);
-	n->val.print_dec.expression_opt = expression_opt;
+	n->val.print_dec.expressions_opt = expression_opt;
 	return n;
 }
 Stmt *newReturnStatement(Exp *expression_opt, int lineno){
 	Stmt *n = newStmt(k_NodeKindReturn, lineno);
-	n->val.return_dec.expressions_opt = expression_opt;
+	n->val.return_dec.expression_opt = expression_opt;
 	return n;
 }
 

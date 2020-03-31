@@ -20,6 +20,7 @@ typedef struct Decl Decl;
 typedef struct Type Type;
 
 typedef struct SYMBOLLIST SYMBOLLIST;
+typedef struct TYPELIST TYPELIST;
 typedef struct SymbolTable SymbolTable;
 typedef struct SYMBOL SYMBOL;
 typedef enum SymbolKind SymbolKind;
@@ -383,7 +384,7 @@ Exp *newIntLiteral(int literal, int lineno);
 Exp *newRuneLiteral(char* literal, int lineno);
 Exp *newFloatLiteral(double literal, int lineno);
 Exp *newStringLiteral(char* literal, int lineno);
-Exp *newExpressionPrimary(Exp *primary_expression, Exp *selector, Exp *index, Exp *identifier, int lineno);
+Exp *newExpressionPrimary(Exp *primary_expression, Exp *selector, Exp *index, Type* identifier_type, Exp *expression, int lineno);
 Exp *newSelector(Exp *identifier, int lineno);
 Exp *newIndex(Exp *expression, int lineno);
 Exp *newBuiltin(Exp *expression1, Exp *expression2, ExpKind kind, int lineno);
