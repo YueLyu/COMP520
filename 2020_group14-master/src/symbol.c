@@ -300,7 +300,7 @@ void symDecl(Decl *n, SymbolTable* cur){
 						temp_exp = temp_exp->val.expressions.expressions;
 						pos ++;
 					}
-					}
+
 					if (len != pos) {
 						fprintf(stderr, "Error: (line %d) The number of expressions and the number of variables don't match.\n", n->lineno);
 							exit(1);
@@ -358,7 +358,7 @@ void symDecl(Decl *n, SymbolTable* cur){
 		    		cur_return_type=NULL;
 		    	}
 
-		    	SYMBOLLIST* paramList = makeSymbolList(n->val.func_dec.func_params);
+		    	SYMBOLLIST* paramList = makeSymbolList(cur, n->val.func_dec.func_params);
 		    	TYPELIST* typelist = makeTypeList(paramList);
 		    	if (n->val.func_dec.func_type == NULL) {
 		    		putSymbol(cur, makeSymbol_function(n->val.func_dec.identifier->val.identifier, typeList, NULL, n->lineno));

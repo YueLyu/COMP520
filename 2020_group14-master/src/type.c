@@ -3,69 +3,9 @@
 #include <string.h>
 #include <memory.h>
 #include "symbol.h"
-#include "tree.h"
+//#include "tree.h"
 #include "type.h"
 
-
-TYPE * checkValidType(SymbolTable * t, TYPE * type, int lineno){
-	if(type) {
-		SYMBOL * s;
-		List * fields;
-		switch (type->kind) {
-		case unknownType:
-			s = getSymbol(t, type->val.ident);
-			if(!s || (s->kind != symkind_type && s->kind != symkind_base)) {
-				fprintf(stderr, "Error: (line %d) %s is not a valid type\n", lineno, type->val.ident);
-				exit(1);
-			}
-			else{
-				free(type);
-				if (s->kind == symkind_type) {
-					if(!s->typelit.defined.type->rt)
-						s->typelit.defined.type->rt = resolve_type_with_TYPE(t, s->typelit.defined.type);
-					return s->typelit.defined.type;
-				}
-				else {
-					s->typelit.type->rt = resolve_type_with_TYPE(t, s->typelit.type);
-					return s->typelit.type;
-				}
-			}
-			break;
-		case nullType:    fprintf(stderr, "Error: (line %d) Nulltype, should not happen, something has gone wrong\n", lineno);
-			exit(1);
-		case structType:
-			fields = type->val.fields;
-			while (fields) {
-				fields->current.param.type = checkValidType(t, fields->current.param.type, lineno);
-				if(fields->current.param.type->rt == NULL)
-					fields->current.param.type->rt = resolve_type_with_TYPE(t, fields->current.param.type);
-				fields = fields->nextli;
-			}
-			type-> rt = type;
-			addStruct(type);
-			break;
-		case arrayType:
-			type->val.arrayData.entryType = checkValidType(t, type->val.arrayData.entryType, lineno);
-			if (!type->val.arrayData.entryType->rt)
-				type->val.arrayData.entryType->rt = resolve_type_with_TYPE(t, type->val.arrayData.entryType);
-			checkValidType(t, type->val.arrayData.entryType->rt, lineno);
-			type-> rt = type;
-			break;
-		case sliceType:
-			type->val.sliceEntryType = checkValidType(t, type->val.sliceEntryType, lineno);
-			type-> rt = type;
-			break;
-		case intType:
-		case floatType:
-		case runeType:
-		case stringType:
-		case boolType:
-			type-> rt = type;
-			break;
-		}
-	}
-	return type;
-}
 
 bool compareType(Type* a, Type* b) {//A very good method
 	if (a == NULL && b == NULL) {
@@ -98,11 +38,13 @@ bool compareType(Type* a, Type* b) {//A very good method
 			}
 			
 		k_NodeKindStructType:
+			;
 			Type *aBody=a->val.identifier_type.identifier_type;
 			Type *bBody=b->val.identifier_type.identifier_type;
 			return compareType(aBody,bBody);
 				
 		k_NodeKindStructBody:
+			;
 			Exp *aFieldNames=a->val.struct_body.identifiers;
 			Exp *bFieldNames=b->val.struct_body.identifiers;
 			Type *aFieldType=a->val.struct_body.type;
@@ -136,14 +78,19 @@ bool compareIdList(Exp *ids1,Exp *ids2){
 Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 	if(n!=NULL){
 		switch(n->kind){
-			case k_NodeKindIdentifiers:	// won't reach this case.
+			case k_NodeKindIdentifiers: // won't reach this case.
+			{
 				break;
+			}
 				
-			case k_NodeKindIdentifier:// 		TODO: doesn't support _ (blank identifier)
+			case k_NodeKindIdentifier: // 		TODO: doesn't support _ (blank identifier)
+			{
+				;
 				SYMBOL* symbol = getSymbol(t, n->val.identifier);
 				Type* inferred_type = symbol->typelit.type;
 				n->type = inferred_type;
 				return inferred_type;
+			}
 				
 			case k_NodeKindExpressions:
 			case k_NodeKindExpressionsOpt:	// won't reach these cases.
@@ -155,19 +102,24 @@ Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 				
 			/* --------------------------- Binary expressions: ---------------------------*/
 			case k_NodeKindExpressionBinaryPlus:		// +
+			{
+				;
 				Type* lhs = inferType_Exp(t, n->val.binary.lhs);
 				Type* rhs = inferType_Exp(t, n->val.binary.rhs);
-				if (compareType(lhs, rhs) && (isNumeric(resolveType(t, lhs)) || isString(resolveType(lhs)))) {
+				if (compareType(lhs, rhs) && (isNumeric(resolveType(t, lhs)) || isString(resolveType(t, lhs)))) {
 					n->type = lhs;
 					return lhs;
 				} else {
 					fprintf(stderr, "Error: (line %d) The operands in binary expression don't type check.", n->lineno);
 					exit(1);
 				}
+			}
 					
 			case k_NodeKindExpressionBinaryMinus:	// -
 			case k_NodeKindExpressionBinaryMultiply:		// *
 			case k_NodeKindExpressionBinaryDivide:	// /
+			{
+				;
 				Type* lhs = inferType_Exp(t, n->val.binary.lhs);
 				Type* rhs = inferType_Exp(t, n->val.binary.rhs);
 				if (compareType(lhs, rhs) && isNumeric(resolveType(t, lhs)) ) {
@@ -177,6 +129,7 @@ Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 					fprintf(stderr, "Error: (line %d) The operands in binary expression don't type check.", n->lineno);
 					exit(1);
 				}
+			}
 					
 			case k_NodeKindExpressionBinaryModulo:	// %
 			case k_NodeKindExpressionBinaryBitAnd:	// &
@@ -185,6 +138,7 @@ Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 			case k_NodeKindExpressionBinarybitClear:		  // &^
 			case k_NodeKindExpressionBinaryLeftShift:	//  <<
 			case k_NodeKindExpressionBinaryRightShift:	// >>
+			{
 				Type* lhs = inferType_Exp(t, n->val.binary.lhs);
 				Type* rhs = inferType_Exp(t, n->val.binary.rhs);
 				if (compareType(lhs, rhs) && isInteger(resolveType(t, lhs))) {
@@ -194,9 +148,11 @@ Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 					fprintf(stderr, "Error: (line %d) The operands in binary expression don't type check.", n->lineno);
 					exit(1);
 				}
+			}
 				
 			case k_NodeKindExpressionBinaryIsEqual:	// ==
 			case k_NodeKindExpressionBinaryIsNotEqual:	// !=
+			{
 				Type* lhs = inferType_Exp(t, n->val.binary.lhs);
 				Type* rhs = inferType_Exp(t, n->val.binary.rhs);
 				if (compareType(lhs, rhs) && isComparable(resolveType(t, lhs))) {
@@ -207,11 +163,13 @@ Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 					fprintf(stderr, "Error: (line %d) The operands in binary expression don't type check.", n->lineno);
 					exit(1);
 				}
+			}
 				
 			case k_NodeKindExpressionBinaryLessThan:		// <
 			case k_NodeKindExpressionBinaryGreaterThan:		// >
 			case k_NodeKindExpressionBinaryLessThanEqual:	// <=
 			case k_NodeKindExpressionBinaryGreaterThanEqual:		// >=
+			{
 				Type* lhs = inferType_Exp(t, n->val.binary.lhs);
 				Type* rhs = inferType_Exp(t, n->val.binary.rhs);
 				if (compareType(lhs, rhs) && isOrdered(resolveType(t, lhs))) {
@@ -222,9 +180,11 @@ Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 					fprintf(stderr, "Error: (line %d) The operands in binary expression don't type check.", n->lineno);
 					exit(1);
 				}
+			}
 				
 			case k_NodeKindExpressionBinaryAnd:		// ||		bool || bool = bool
 			case k_NodeKindExpressionBinaryOr:		// &&		bool && bool = bool
+			{
 				Type* lhs = inferType_Exp(t, n->val.binary.lhs);
 				Type* rhs = inferType_Exp(t, n->val.binary.rhs);
 				if (compareType(lhs, rhs) && isBool(resolveType(t, lhs))) {
@@ -234,10 +194,12 @@ Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 					fprintf(stderr, "Error: (line %d) The operands in binary expression don't type check.", n->lineno);
 					exit(1);
 				}
+			}
 			
 			/* --------------------------- Unary expressions: ---------------------------*/
 			case k_NodeKindUMinus:
 			case k_NodeKindUPlus:	// -, + : numeric type
+			{
 				Type* operand_type = inferType_Exp(t, n->val.unary.operand);
 				if(isNumeric(resolveType(t, operand_type))) {
 					n->type = operand_type;
@@ -246,7 +208,9 @@ Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 					fprintf(stderr, "Error: (line %d) The operand in unary expression doesn't type check.", n->lineno);
 					exit(1);
 				}
+			}
 			case k_NodeKindUNot:		// ! : bool type
+			{
 				Type* operand_type = inferType_Exp(t, n->val.unary.operand);
 				if(isBool(resolveType(t, operand_type))) {
 					n->type = operand_type;
@@ -255,7 +219,9 @@ Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 					fprintf(stderr, "Error: (line %d) The operand in unary expression doesn't type check.", n->lineno);
 					exit(1);
 				}
+			}
 			case k_NodeKindUXor:		// ^ : int, rune
+			{
 				Type* operand_type = inferType_Exp(t, n->val.unary.operand);
 				if(isInt(resolveType(t, operand_type))
 					|| isRune(resolveType(t, operand_type))) {
@@ -265,30 +231,41 @@ Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 					fprintf(stderr, "Error: (line %d) The operand in unary expression doesn't type check.", n->lineno);
 					exit(1);
 				}
-			
+			}
 			/* ----------------------------------- Literals: -----------------------------------*/
 			case k_NodeKindIntLiteral:
+			{
 				Type* inferred_type = newIdType("int", n->lineno);
-				n->type = inferred_type
+				n->type = inferred_type;
 				return inferred_type;
+			}
 			case k_NodeKindRuneLiteral:
+			{
 				Type* inferred_type = newIdType("rune", n->lineno);
-				n->type = inferred_type
+				n->type = inferred_type;
 				return inferred_type;
+			}
 			case k_NodeKindFloatLiteral:
+			{
 				Type* inferred_type = newIdType("float64", n->lineno);
-				n->type = inferred_type
+				n->type = inferred_type;
 				return inferred_type;
+			}
 			case k_NodeKindStringLiteral:
+			{
 				Type* inferred_type = newIdType("string", n->lineno);
-				n->type = inferred_type
+				n->type = inferred_type;
 				return inferred_type;
+			}
 
 			/* ----------------------------- Primary Expressions: -------------------------------*/
 			case k_NodeKindExpressionsPrimary:	// TODO: Won't reach this case
+			{
 				break;
+			}
 				
 			case k_NodeKindExpressionPrimary:
+			{
 				if(n->val.primary_expression.primary_expression != NULL){
 					//n is a selector or an index
 					if(n->val.primary_expression.index!=NULL){
@@ -347,14 +324,18 @@ Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 					n->type = inferred_type;
 					return inferred_type;
 				}
+			}
 				
 			case k_NodeKindSelector:	// Won't reach this case.
+			{
 				break;
+			}
 
 			case k_NodeKindIndex:
 				return inferType_Exp(t, n->val.index.expression);
 
 			case k_NodeKindAppend://append []T T = []T
+			{
 				Type* type1 = inferType_Exp(t, n->val.builtins.expression1);
 				Type* resolved_type1 = resolveType(t, type1);
 				if (resolved_type1->kind != k_NodeKindArrayType) {
@@ -362,14 +343,16 @@ Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 					exit(1);
 				}
 				Type* type2 = inferType_Exp(t, n->val.builtins.expression2);
-				if(compareType(resolved_type1->val.identifierType.identifierType, type2)){
+				if(compareType(resolved_type1->val.identifier_type.identifier_type, type2)){
 					n->type = type1;
 					return type1;
 				}else{
 					fprintf(stderr, "Error: (line %d) Type checking of builtin function call failed", n->lineno);
 					exit(1);
 				}
+			}
 			case k_NodeKindLen://len []T/[N]T = int
+			{
 				Type* type1 = inferType_Exp(t, n->val.builtins.expression1);
 				Type* resolved_type1 = resolveType(t, type1);
 				if (resolved_type1->kind != k_NodeKindArrayType && resolved_type1->kind != k_NodeKindSliceType
@@ -379,21 +362,25 @@ Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 				}
 				n->type = newIdType("int", 0);
 				return n->type;
+			}
 			case k_NodeKindCap://cap []T/[N]T = int
+			{
 				Type* type1 = inferType_Exp(t, n->val.builtins.expression1);
 				Type* resolved_type1 = resolveType(t, type1);
 				if (resolved_type1->kind != k_NodeKindArrayType && resolved_type1->kind != k_NodeKindSliceType) {
 					fprintf(stderr, "Error: (line %d) The first expression in cap function call should be resolved to array or slice type.", n->lineno);
 					exit(1);
 				}
-				n->type = newIdType("int", 0)
+				n->type = newIdType("int", 0);
 				return n->type;
+			}
 
 			case k_NodeKindFuncCall:// TODO: check func_type
-				Symbol* s = getSymbol(t, n->val.func_call.identifier->val.identifier);
+			{
+				SYMBOL* s = getSymbol(t, n->val.func_call.identifier->val.identifier);
 				Type* return_type = s->typelit.functiondec.returnType;
 				Exp* parameters = n->val.func_call.expressions_opt;
-				TYPELIST* target_types = s->typelit.functiondec.typelist
+				TYPELIST* target_types = s->typelit.functiondec.typelist;
 
 				if (parameter == NULL) { // Function with no params.
 					if (target_types!= NUL)
@@ -416,6 +403,7 @@ Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 					 exit(1);
 				}
 				return return_type;
+			}
 		}
 	}
 	return NULL;
@@ -427,8 +415,9 @@ Type* checkStructId(Type* n, Exp* id) {
 	if (n != NULL) {
 		switch (n->kind) {
 			case k_NodeKindStructType:
-				return checkStructId(n->val.identifier_type->identifier_type, id);
+				return checkStructId(n->val.identifier_type.identifier_type, id);
 			case k_NodeKindStructBody:
+			{
 				Exp* ids = n->val.struct_body->identifiers;
 				while(ids != NULL) {
 					if (strcmp(id->val.identifier, ids->val.identifiers.identifier->val.identifier) == 0) {
@@ -436,7 +425,8 @@ Type* checkStructId(Type* n, Exp* id) {
 					}
 					ids = ids->val.identifiers.identifiers;
 				}
-				return checkStructId(n->val.struct_body->struct_body, id);
+				return checkStructId(n->val.struct_body.struct_body, id);
+			}
 			default:	// Won't reach this case.
 				return NULL;
 		}
