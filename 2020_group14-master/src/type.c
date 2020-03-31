@@ -393,15 +393,29 @@ Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 				Symbol* s = getSymbol(t, n->val.func_call.identifier->val.identifier);
 				Type* return_type = s->typelit.functiondec.returnType;
 				Exp* parameters = n->val.func_call.expressions_opt;
-				if (parameter == NULL) {	// Function with no params.
+				TYPELIST* target_types = s->typelit.functiondec.typelist
 
+				if (parameter == NULL) { // Function with no params.
+					if (target_types!= NUL)
+					return return_type;
 				}
-				parameters = parameters->val.expressions.expressions;
-				while(parameters!=NULL){
-					parameters->val.expressions.expression
-					Type* inferred_type = inferType_Exp(t, parameters->val.expression);
-					Type* target_type =
+
+				while(parameters!=NULL && target_types!=NULL){
+					 Type* inferred_type = inferType_Exp(t, parameters->val.expressions.expression);
+					 Type* target_type = target_types.currType;
+					 if(compareType(inferred_type, target_type)){
+						  parameters = parameters->val.expressions.expressions;
+						  target_types = target_types.next;
+					 }else{
+						  fprintf(stderr, "Error: (line %d) Parameter types don't match.", n->lineno);
+						  exit(1);
+					 }
 				}
+				if(parameters!=NULL || target_types!=NULL){
+					 fprintf(stderr, "Error: (line %d) Parameter numbers don't match.", n->lineno);
+					 exit(1);
+				}
+				return return_type;
 		}
 	}
 	return NULL;
@@ -504,24 +518,36 @@ bool isInteger(Type* type) {
 					 array(if values of array element type are comparable)
 */
 bool isComparable(Type* type) {
-	if (type == NULL) {
-		return true;
-	}
-	if (type->inferType == BoolType || type->inferType == IntType 
-		|| type->inferType == Float64Type
-		|| type->inferType == StringType) {
-		return true;
-	} else if (type->inferType == StructType) {
-		return isComparable(type->val.identifier_type.identifier_type);
-	} else if (type->inferType == ArrayType) {
-		return isComparable(type->val.identifier_type.identifier_type);
-	} else if (type->inferType == UnknownType && type->kind == k_NodeKindStructBody) {
-		return isComparable(type->val.struct_body.type) 
-			&& isComparable(type->val.struct_body.struct_body);
+	if (type != NULL) {
+		switch (type->kind) {
+			case k_NodeKindArrayType:
+			case k_NodeKindSliceType:
+				return isComparable(type->val.identifier_type.identifier_type);
+			case k_NodeKindIdType:
+				if (strcmp(type->val.identifier, "int") == 0
+						|| strcmp(type->val.identifier, "float64") == 0
+						|| strcmp(type->val.identifier, "bool") == 0
+						|| strcmp(type->val.identifier, "rune") == 0
+						|| strcmp(type->val.identifier, "string") == 0) {
+					return true;
+				} else {
+					return false;
+				}
+			case k_NodeKindParType:
+				return isComparable(t, type->val.identifier_type.identifier_type);
+			case k_NodeKindStructType:
+				return isComparable(type->val.identifier_type.identifier_type);
+			case k_NodeKindStructBody:
+				if (!isComparable(n->val.struct_body.type)) {
+					return false;
+				}
+				return isComparable(n->val.struct_body.struct_body);
+		}
 	} else {
-		return false;
+		return true;
 	}
 }
+
 /*  ordered type: int, float64, string  */
 bool isOrdered(Type* type) {
 	return compareType(type, newIdType("int", 0)) || compareType(type, newIdType("float64", 0))
