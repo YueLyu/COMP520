@@ -244,7 +244,7 @@ Stmt *newSwitchDef(Stmt *simple_statement, Exp *expression_opt, int lineno){
 Stmt *newSwitchCases(Stmt *cases, Exp *expressions, Stmt *statements, StmtKind kind, int lineno){
 	Stmt *n = newStmt(kind, lineno);
 	n->val.switch_cases.cases = cases;
-	n->val.switch_cases.expressions = expressions;
+	n->val.switch_cases.expression = expressions;
 	n->val.switch_cases.statements = statements;
 	return n;
 }
@@ -352,3 +352,4 @@ Exp *newFuncCall(Exp *identifier, Exp *expressions_opt, int lineno){
 	n->val.func_call.expressions_opt = expressions_opt;
 	return n;
 }
+

@@ -382,17 +382,17 @@ Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 				Exp* parameters = n->val.func_call.expressions_opt;
 				TYPELIST* target_types = s->typelit.functiondec.typelist;
 
-				if (parameter == NULL) { // Function with no params.
-					if (target_types!= NUL)
+				if (parameters == NULL) { // Function with no params.
+					if (target_types!= NULL)
 					return return_type;
 				}
 
 				while(parameters!=NULL && target_types!=NULL){
 					 Type* inferred_type = inferType_Exp(t, parameters->val.expressions.expression);
-					 Type* target_type = target_types.currType;
+					 Type *target_type = target_types->currType;
 					 if(compareType(inferred_type, target_type)){
 						  parameters = parameters->val.expressions.expressions;
-						  target_types = target_types.next;
+						  target_types = target_types->next;
 					 }else{
 						  fprintf(stderr, "Error: (line %d) Parameter types don't match.", n->lineno);
 						  exit(1);
@@ -418,7 +418,7 @@ Type* checkStructId(Type* n, Exp* id) {
 				return checkStructId(n->val.identifier_type.identifier_type, id);
 			case k_NodeKindStructBody:
 			{
-				Exp* ids = n->val.struct_body->identifiers;
+				Exp* ids = n->val.struct_body.identifiers;
 				while(ids != NULL) {
 					if (strcmp(id->val.identifier, ids->val.identifiers.identifier->val.identifier) == 0) {
 						return n->val.struct_body.type;
@@ -524,14 +524,14 @@ bool isComparable(Type* type) {
 					return false;
 				}
 			case k_NodeKindParType:
-				return isComparable(t, type->val.identifier_type.identifier_type);
+				return isComparable(type->val.identifier_type.identifier_type);
 			case k_NodeKindStructType:
 				return isComparable(type->val.identifier_type.identifier_type);
 			case k_NodeKindStructBody:
-				if (!isComparable(n->val.struct_body.type)) {
+				if (!isComparable(type->val.struct_body.type)) {
 					return false;
 				}
-				return isComparable(n->val.struct_body.struct_body);
+				return isComparable(type->val.struct_body.struct_body);
 		}
 	} else {
 		return true;
@@ -543,5 +543,6 @@ bool isOrdered(Type* type) {
 	return compareType(type, newIdType("int", 0)) || compareType(type, newIdType("float64", 0))
 				|| compareType(type, newIdType("string", 0));
 }
+
 
 

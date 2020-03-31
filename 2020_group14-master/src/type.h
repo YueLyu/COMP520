@@ -48,3 +48,4 @@ bool isOrdered(Type* type);
 
 
 #endif /* !TYPECHECK_H */
+

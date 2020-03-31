@@ -236,7 +236,7 @@ struct Stmt{
 		struct { Stmt *left; Exp *expression; Stmt *right;}for_condition;
 		struct { Stmt *switch_def; Stmt *switch_cases;}switch_dec;
 		struct { Stmt *simple_statement; Exp *expression_opt;}switch_def;
-		struct { Stmt *cases; Exp *expressions; Stmt *statements;}switch_cases;
+		struct { Stmt *cases; Exp *expression; Stmt *statements;}switch_cases;
     }val;
 };
 
@@ -283,7 +283,7 @@ enum SymbolKind {
 
 struct TYPELIST {
 	Type* currType;
-	Type* next;
+	TYPELIST* next;
 };
 
 struct SYMBOLLIST {
@@ -384,6 +384,7 @@ Exp *newIntLiteral(int literal, int lineno);
 Exp *newRuneLiteral(char* literal, int lineno);
 Exp *newFloatLiteral(double literal, int lineno);
 Exp *newStringLiteral(char* literal, int lineno);
+Exp *newExpressionsPrimary(Exp *primary_expressions, Exp *primary_expression, int lineno);
 Exp *newExpressionPrimary(Exp *primary_expression, Exp *selector, Exp *index, Type* identifier_type, Exp *expression, int lineno);
 Exp *newSelector(Exp *identifier, int lineno);
 Exp *newIndex(Exp *expression, int lineno);
@@ -391,3 +392,4 @@ Exp *newBuiltin(Exp *expression1, Exp *expression2, ExpKind kind, int lineno);
 Exp *newFuncCall(Exp *identifier, Exp *expressions_opt, int lineno);
 
 #endif /* !TREE_H */
+

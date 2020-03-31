@@ -58,7 +58,7 @@ void yyerror(const char *s) {
 %type <exp>    	expression
 %type <exp>   	expressions
 %type <exp>   	primary_expression
-%type <exp>		primary_expressions
+//%type <exp>		primary_expressions
 %type <exp>		selector
 %type <exp>		index
 %type <exp>		func_call
@@ -745,7 +745,7 @@ simple_statement[root]
         {
 			$root = newSimpleStatement($expr, NULL, k_NodeKindSimpleStatementDecrease, @expr.first_line);
         }
-    | primary_expressions[left] tEQUAL expressions[right]	// primary_expression is changed to primary_expressions
+    | identifiers[left] tEQUAL expressions[right]	// primary_expression is changed to primary_expressions. weeder
         {
 			$root = newSimpleStatement($left, $right, k_NodeKindSimpleStatementEqual, @left.first_line);
         }
@@ -1051,7 +1051,7 @@ func_call[root]
 			$root=newFuncCall(newIdentifier($id,@id.first_line),$exprs,@id.first_line);
         }*/
     ;
-
+/*
 primary_expressions[root]
 	: primary_expressions[exps] tCOMMA primary_expression[exp]
         {
@@ -1062,7 +1062,7 @@ primary_expressions[root]
             $root = newExpressionsPrimary(NULL, $exp, @exp.first_line);
         }
     ;
-	
+*/
 
 /**
  * Expression decorators
@@ -1085,10 +1085,10 @@ primary_expression[root]
         {
     $root=newExpressionPrimary(NULL,NULL,NULL,NULL,newIdentifier($id,@id.first_line),@id.first_line);
         }
-	| identifier_type[type] tLEFT_PAR expression tRIGHT_PAR // type cast
+	/*| identifier_type[type] expression // type cast, need weeding for ()
 		{
-			$root=newExpressionPrimary(NULL,NULL,NULL,$type,$3, @type.first_line);
-        }
+			$root=newExpressionPrimary(NULL,NULL,NULL,$type,$2, @type.first_line);
+        }*/
     ;
 
 /**
@@ -1110,6 +1110,7 @@ index[root]
 			$root=newIndex($expr,@1.first_line);
         }
     ;
+
 
 
 
