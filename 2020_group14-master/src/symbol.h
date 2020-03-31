@@ -6,7 +6,7 @@
 
 SYMBOL * makeSymbol_var(char * name, Type * type, int lineno);
 SYMBOL * makeSymbol_const(char * name, Type * type);
-SYMBOL * makeSymbol_function(char * name, SYMBOLLIST * func_params, Type *returnType, int lineno);
+SYMBOL * makeSymbol_function(char * name, TYPELIST * typelist, Type *returnType, int lineno);
 SYMBOL * makeSymbol_base(char* name, Type * type);
 SYMBOL * makeSymbol_type(char * name, Type * type, int lineno);
 SYMBOL * makeSymbol_struct(char * name, SYMBOLLIST * fieldList, Type * structtype);

@@ -297,7 +297,7 @@ struct SYMBOL {
 	union {
 		Type * type;
 		struct {struct SYMBOL * underlying; Type * type;} defined; //for defined types
-		struct {SYMBOLLIST * paramList; Type *returnType;} functiondec;
+		struct {TYPELIST * typelist; Type *returnType;} functiondec;
 		struct {SYMBOLLIST * fieldList; Type * structtype;} structdec;
 		struct {struct SYMBOL * entrytype; Type * slicetype;} slicedec;
 		struct {struct SYMBOL * entrytype; Type * arraytype;} arraydec;

@@ -25,11 +25,11 @@ SYMBOL * makeSymbol_const(char * name, Type * type) {
 	return s;
 }
 
-SYMBOL * makeSymbol_function(char * name, SYMBOLLIST * paramList, Type *returnType, int lineno){
+SYMBOL * makeSymbol_function(char * name, TYPELIST * typelist, Type *returnType, int lineno){
 	SYMBOL * s = malloc(sizeof(SYMBOL));
 	s->kind = symkind_func;
 	s->name = name;
-	s->typelit.functiondec.paramList = paramList;
+	s->typelit.functiondec.typelist = typelist;
 	s->typelit.functiondec.returnType = returnType;
 	s->lineno = lineno;
 	return s;
@@ -120,7 +120,17 @@ SYMBOLLIST * makeSymbolList(SymbolTable* t, Decl *funcParams) {
 }
 
 TYPELIST * makeTypeList(SYMBOLLIST * params) {
-
+	SYMBOLLIST * currS = params;
+	TYPELIST * list = malloc(sizeof(TYPELIST));
+	TYPELIST * head = list;
+	while (currS != NULL && currS->currSym != NULL) {
+		s = currS->currSym;
+		list->currType = s.typelit.type;
+		list->next = malloc(sizeof(TYPELIST));
+		list = list->next;
+		currS = currS->next;
+	}
+	return head;
 }
 
 //Symbol table related functions.
@@ -333,12 +343,12 @@ void symDecl(Decl *n, SymbolTable* cur){
 		    	putSymbol(cur, makeSymbol_type(n->val.type_def.identifier->val.identifier, n->val.type_def.identifier_type, n->lineno));
 				break;
 		    case k_NodeKindFuncDec:
-		    	//check for special functions
+		        //check for special functions
 		    	if(strcmp(n->val.func_dec.identifier->val.identifier, "main")==0||strcmp(n->val.func_dec.identifier->val.identifier, "main")==0){
-		    		if(n->val.func_dec.func_type!=NULL||n->val.func_dec.func_params!=NULL){
-		    			fprintf(stderr, "Error: (line %d) funcion init or main should have no parameters nor return value.\n", n->lineno);
+					if(n->val.func_dec.func_type!=NULL||n->val.func_dec.func_params!=NULL){
+						fprintf(stderr, "Error: (line %d) funcion init or main should have no parameters nor return value.\n", n->lineno);
 						exit(1);
-		    		}
+					}
 		    	}
 		    	if(n->val.func_dec.func_type->val.func_type.identifier_type!=NULL){
 		    		checkType(cur, n->val.func_dec.func_type->val.func_type.identifier_type);
@@ -349,16 +359,17 @@ void symDecl(Decl *n, SymbolTable* cur){
 		    	}
 
 		    	SYMBOLLIST* paramList = makeSymbolList(n->val.func_dec.func_params);
+		    	TYPELIST* typelist = makeTypeList(paramList);
 		    	if (n->val.func_dec.func_type == NULL) {
-		    		putSymbol(cur, makeSymbol_function(n->val.func_dec.identifier->val.identifier, paramList, NULL, n->lineno));
+		    		putSymbol(cur, makeSymbol_function(n->val.func_dec.identifier->val.identifier, typeList, NULL, n->lineno));
 		    	} else {
-		    		putSymbol(cur, makeSymbol_function(n->val.func_dec.identifier->val.identifier, paramList, n->val.func_dec.func_type->val.func_type.identifier_type, n->lineno));
+		    		putSymbol(cur, makeSymbol_function(n->val.func_dec.identifier->val.identifier, typeList, n->val.func_dec.func_type->val.func_type.identifier_type, n->lineno));
 		    	}
-				
-				if (n->val.func_dec.block_body != NULL) {
-					symStmt(n->val.func_dec.block_body, cur, paramList);
-				}
-				break;
+
+		    	if (n->val.func_dec.block_body != NULL) {
+		    		symStmt(n->val.func_dec.block_body, cur, paramList);
+		    	}
+		    	break;
 		    case k_NodeKindFuncParams:
 		    case k_NodeKindFuncType:
 				break;
