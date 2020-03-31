@@ -6,36 +6,6 @@
 #include "tree.h"
 #include "type.h"
 
-TYPE * resolveType(SymbolTable * t, SYMBOL * sym) {
-	if (sym == NULL) {
-		fprintf(stderr, "Error: Trying to resolve type of NULL.");
-		exit(1);
-	}
-	switch (sym->kind) {
-	case symkind_var:
-		fprintf(stderr, "Error: Cannot resolve type for a variable.");
-		exit(1);
-		break;
-	case symkind_func:
-		fprintf(stderr, "Error: Cannot resolve type for a function.");
-		exit(1);
-		break;
-	case symkind_const:
-		fprintf(stderr, "Error: Cannot resolve type for a constant.");
-		exit(1);
-		break;
-	case symkind_type:
-		return resolveType(t, sym->typelit.defined.underlying); break;
-	case symkind_struct:
-		return sym->typelit.structdec.structtype; break;
-	case symkind_array:
-		return sym->typelit.arraydec.arraytype; break;
-	case symkind_slice:
-		return sym->typelit.slicedec.slicetype; break;
-	case symkind_base: return sym->typelit.type; break;
-	}
-	return NULL;
-}
 
 TYPE * checkValidType(SymbolTable * t, TYPE * type, int lineno){
 	if(type) {
@@ -166,63 +136,396 @@ bool compareIdList(Exp *ids1,Exp *ids2){
 Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 	if(n!=NULL){
 		switch(n->kind){
-			k_NodeKindIdentifiers:
-				typecheck_Exp(SymbolTable* t, n->val.identifiers.identifiers);
-				typecheck_Exp(SymbolTable* t, n->val.identifiers.identifier);
+			case k_NodeKindIdentifiers:	// won't reach this case.
 				break;
-			k_NodeKindIdentifier,
-				typecheck_Exp()
+				
+			case k_NodeKindIdentifier:// 		TODO: doesn't support _ (blank identifier)
+				SYMBOL* symbol = getSymbol(t, n->val.identifier);
+				Type* inferred_type = symbol->typelit.type;
+				n->type = inferred_type;
+				return inferred_type;
+				
+			case k_NodeKindExpressions:
+			case k_NodeKindExpressionsOpt:	// won't reach these cases.
 				break;
-			k_NodeKindExpressions,
-			k_NodeKindExpressionOpt,
-			k_NodeKindExpressionsOpt,
-			k_NodeKindExpression,
+				
+			case k_NodeKindExpressionOpt:
+			case k_NodeKindExpression:
+				return inferType_Exp(t, n->val.expression.expression);
+				
+			/* --------------------------- Binary expressions: ---------------------------*/
+			case k_NodeKindExpressionBinaryPlus:		// +
+				Type* lhs = inferType_Exp(t, n->val.binary.lhs);
+				Type* rhs = inferType_Exp(t, n->val.binary.rhs);
+				if (compareType(lhs, rhs) && (isNumeric(resolveType(t, lhs)) || isString(resolveType(lhs)))) {
+					n->type = lhs;
+					return lhs;
+				} else {
+					fprintf(stderr, "Error: (line %d) The operands in binary expression don't type check.", n->lineno);
+					exit(1);
+				}
+					
+			case k_NodeKindExpressionBinaryMinus:	// -
+			case k_NodeKindExpressionBinaryMultiply:		// *
+			case k_NodeKindExpressionBinaryDivide:	// /
+				Type* lhs = inferType_Exp(t, n->val.binary.lhs);
+				Type* rhs = inferType_Exp(t, n->val.binary.rhs);
+				if (compareType(lhs, rhs) && isNumeric(resolveType(t, lhs)) ) {
+					n->type = lhs;
+					return lhs;
+				} else {
+					fprintf(stderr, "Error: (line %d) The operands in binary expression don't type check.", n->lineno);
+					exit(1);
+				}
+					
+			case k_NodeKindExpressionBinaryModulo:	// %
+			case k_NodeKindExpressionBinaryBitAnd:	// &
+			case k_NodeKindExpressionBinaryBitOr:	// |
+			case k_NodeKindExpressionBinaryBitXor:	// ^
+			case k_NodeKindExpressionBinarybitClear:		  // &^
+			case k_NodeKindExpressionBinaryLeftShift:	//  <<
+			case k_NodeKindExpressionBinaryRightShift:	// >>
+				Type* lhs = inferType_Exp(t, n->val.binary.lhs);
+				Type* rhs = inferType_Exp(t, n->val.binary.rhs);
+				if (compareType(lhs, rhs) && isInteger(resolveType(t, lhs))) {
+					n->type = lhs;
+					return lhs;
+				} else {
+					fprintf(stderr, "Error: (line %d) The operands in binary expression don't type check.", n->lineno);
+					exit(1);
+				}
+				
+			case k_NodeKindExpressionBinaryIsEqual:	// ==
+			case k_NodeKindExpressionBinaryIsNotEqual:	// !=
+				Type* lhs = inferType_Exp(t, n->val.binary.lhs);
+				Type* rhs = inferType_Exp(t, n->val.binary.rhs);
+				if (compareType(lhs, rhs) && isComparable(resolveType(t, lhs))) {
+					Type* inferred_type = newIdType("bool", n->lineno);
+					n->type = inferred_type;
+					return inferred_type;
+				} else {
+					fprintf(stderr, "Error: (line %d) The operands in binary expression don't type check.", n->lineno);
+					exit(1);
+				}
+				
+			case k_NodeKindExpressionBinaryLessThan:		// <
+			case k_NodeKindExpressionBinaryGreaterThan:		// >
+			case k_NodeKindExpressionBinaryLessThanEqual:	// <=
+			case k_NodeKindExpressionBinaryGreaterThanEqual:		// >=
+				Type* lhs = inferType_Exp(t, n->val.binary.lhs);
+				Type* rhs = inferType_Exp(t, n->val.binary.rhs);
+				if (compareType(lhs, rhs) && isOrdered(resolveType(t, lhs))) {
+					Type* inferred_type = newIdType("bool", n->lineno);
+					n->type = inferred_type;
+					return inferred_type;
+				} else {
+					fprintf(stderr, "Error: (line %d) The operands in binary expression don't type check.", n->lineno);
+					exit(1);
+				}
+				
+			case k_NodeKindExpressionBinaryAnd:		// ||		bool || bool = bool
+			case k_NodeKindExpressionBinaryOr:		// &&		bool && bool = bool
+				Type* lhs = inferType_Exp(t, n->val.binary.lhs);
+				Type* rhs = inferType_Exp(t, n->val.binary.rhs);
+				if (compareType(lhs, rhs) && isBool(resolveType(t, lhs))) {
+					n->type = lhs;
+					return lhs;
+				} else {
+					fprintf(stderr, "Error: (line %d) The operands in binary expression don't type check.", n->lineno);
+					exit(1);
+				}
 			
-			k_NodeKindExpressionBinaryPlus,
-			k_NodeKindExpressionBinaryMinus,
-			k_NodeKindExpressionBinaryMultiply,
-			k_NodeKindExpressionBinaryDivide,
-			k_NodeKindExpressionBinaryModulo,
-			k_NodeKindExpressionBinaryBitAnd,
-			k_NodeKindExpressionBinaryBitOr,
-			k_NodeKindExpressionBinaryBitXor,
-			k_NodeKindExpressionBinarybitClear,
-			k_NodeKindExpressionBinaryLeftShift,
-			k_NodeKindExpressionBinaryRightShift,
-			k_NodeKindExpressionBinaryIsEqual,
-			k_NodeKindExpressionBinaryIsNotEqual,
-			k_NodeKindExpressionBinaryLessThan,
-			k_NodeKindExpressionBinaryGreaterThan,
-			k_NodeKindExpressionBinaryLessThanEqual,
-			k_NodeKindExpressionBinaryGreaterThanEqual,
-			k_NodeKindExpressionBinaryAnd,
-			k_NodeKindExpressionBinaryOr,
+			/* --------------------------- Unary expressions: ---------------------------*/
+			case k_NodeKindUMinus:
+			case k_NodeKindUPlus:	// -, + : numeric type
+				Type* operand_type = inferType_Exp(t, n->val.unary.operand);
+				if(isNumeric(resolveType(t, operand_type))) {
+					n->type = operand_type;
+					return operand_type;
+				} else {
+					fprintf(stderr, "Error: (line %d) The operand in unary expression doesn't type check.", n->lineno);
+					exit(1);
+				}
+			case k_NodeKindUNot:		// ! : bool type
+				Type* operand_type = inferType_Exp(t, n->val.unary.operand);
+				if(isBool(resolveType(t, operand_type))) {
+					n->type = operand_type;
+					return operand_type;
+				} else {
+					fprintf(stderr, "Error: (line %d) The operand in unary expression doesn't type check.", n->lineno);
+					exit(1);
+				}
+			case k_NodeKindUXor:		// ^ : int, rune
+				Type* operand_type = inferType_Exp(t, n->val.unary.operand);
+				if(isInt(resolveType(t, operand_type))
+					|| isRune(resolveType(t, operand_type))) {
+					n->type = operand_type;
+					return operand_type;
+				} else {
+					fprintf(stderr, "Error: (line %d) The operand in unary expression doesn't type check.", n->lineno);
+					exit(1);
+				}
 			
-			k_NodeKindUMinus,
-			k_NodeKindUPlus,
-			k_NodeKindUNot,
-			k_NodeKindUXor,
-			
-			k_NodeKindIntLiteral,
-			k_NodeKindRuneLiteral,
-			k_NodeKindFloatLiteral,
-			k_NodeKindStringLiteral,
-			
-			k_NodeKindExpressionPrimary,
-			k_NodeKindSelector,
-			k_NodeKindIndex,
-			
-			k_NodeKindAppend,
-			k_NodeKindLen,
-			k_NodeKindCap,
-			k_NodeKindFuncCall,
+			/* ----------------------------------- Literals: -----------------------------------*/
+			case k_NodeKindIntLiteral:
+				Type* inferred_type = newIdType("int", n->lineno);
+				n->type = inferred_type
+				return inferred_type;
+			case k_NodeKindRuneLiteral:
+				Type* inferred_type = newIdType("rune", n->lineno);
+				n->type = inferred_type
+				return inferred_type;
+			case k_NodeKindFloatLiteral:
+				Type* inferred_type = newIdType("float64", n->lineno);
+				n->type = inferred_type
+				return inferred_type;
+			case k_NodeKindStringLiteral:
+				Type* inferred_type = newIdType("string", n->lineno);
+				n->type = inferred_type
+				return inferred_type;
+
+			/* ----------------------------- Primary Expressions: -------------------------------*/
+			case k_NodeKindExpressionsPrimary:	// TODO: Won't reach this case
+				break;
+				
+			case k_NodeKindExpressionPrimary:
+				if(n->val.primary_expression.primary_expression != NULL){
+					//n is a selector or an index
+					if(n->val.primary_expression.index!=NULL){
+						//n is an index
+						Type* index_type = inferType_Exp(t, n->val.primary_expression.index);
+						if(!isInt(index_type)){
+							fprintf(stderr, "Error: (line %d) The index should be an integer.", n->lineno);
+							exit(1);
+						}
+						Type* inferred_type = inferType_Exp(t, n->val.primary_expression.primary_expression);
+						Type* resolved_type = resolveType(t, inferred_type);
+						if (resolved_type->kind != k_NodeKindArrayType && resolved_type->kind != k_NodeKindSliceType) {
+							fprintf(stderr, "Error: (line %d) The expression should be resolved to array or slice type.", n->lineno);
+							exit(1);
+						}
+						n->type = resolved_type->val.identifier_type.identifier_type;
+						return resolved_type->val.identifier_type.identifier_type;
+					}else if(n->val.primary_expression.selector!=NULL){
+						//n is a selector
+						Type* inferred_type = inferType_Exp(t, n->val.primary_expression.primary_expression);
+						Type* resolved_type = resolveType(t, inferred_type);
+						if (resolved_type->kind != k_NodeKindStructType) {
+							fprintf(stderr, "Error: (line %d) The expression should be resolved to struct type in field selection.", n->lineno);
+							exit(1);
+						}
+						// Check if struct type contains a field called id.
+						Type* id_type = checkStructId(resolved_type, n->val.primary_expression.selector->val.selector.identifier);
+						if (id_type == NULL) {
+							fprintf(stderr, "Error: (line %d) The struct doesn't contain the given identifier.", n->lineno);
+							exit(1);
+						}
+						return id_type;
+					}
+					return inferType_Exp(t, n->val.primary_expression.primary_expression);
+				} else if (n->val.primary_expression.identifier_type != NULL){
+					// n is a type cast node.
+					Type* identifier_type = resolveType(t, n->val.primary_expression.identifier_type);
+					if (!isBasic(identifier_type)) {
+						fprintf(stderr, "Error: (line %d) expression can only be casted to basic type.", n->lineno);
+						exit(1);
+					}
+					Type* inferred_type = inferType_Exp(t, n->val.primary_expression.expression);
+					Type* resolved_type = resolveType(t, inferred_type);
+					if (compareType(identifier_type, resolved_type)
+							|| (isNumeric(identifier_type) && isNumeric(resolved_type))
+							|| (isString(identifier_type) && isInteger(resolved_type))) {
+						n->type = n->val.primary_expression.identifier_type;
+						return n->val.primary_expression.identifier_type;
+					} else {
+						fprintf(stderr, "Error: (line %d) the expression can't be casted to the given type.", n->lineno);
+						exit(1);
+					}
+				} else {
+					//n is a function call or identifier, get the type from symbol table
+					Type* inferred_type = inferType_Exp(t, n->val.primary_expression.expression);
+					n->type = inferred_type;
+					return inferred_type;
+				}
+				
+			case k_NodeKindSelector:	// Won't reach this case.
+				break;
+
+			case k_NodeKindIndex:
+				return inferType_Exp(t, n->val.index.expression);
+
+			case k_NodeKindAppend://append []T T = []T
+				Type* type1 = inferType_Exp(t, n->val.builtins.expression1);
+				Type* resolved_type1 = resolveType(t, type1);
+				if (resolved_type1->kind != k_NodeKindArrayType) {
+					fprintf(stderr, "Error: (line %d) The first expression in append should be resolved to array type.", n->lineno);
+					exit(1);
+				}
+				Type* type2 = inferType_Exp(t, n->val.builtins.expression2);
+				if(compareType(resolved_type1->val.identifierType.identifierType, type2)){
+					n->type = type1;
+					return type1;
+				}else{
+					fprintf(stderr, "Error: (line %d) Type checking of builtin function call failed", n->lineno);
+					exit(1);
+				}
+			case k_NodeKindLen://len []T/[N]T = int
+				Type* type1 = inferType_Exp(t, n->val.builtins.expression1);
+				Type* resolved_type1 = resolveType(t, type1);
+				if (resolved_type1->kind != k_NodeKindArrayType && resolved_type1->kind != k_NodeKindSliceType
+						&& !isString(resolved_type1)) {
+					fprintf(stderr, "Error: (line %d) The first expression in len function call should be resolved to array, slice, or string type.", n->lineno);
+					exit(1);
+				}
+				n->type = newIdType("int", 0);
+				return n->type;
+			case k_NodeKindCap://cap []T/[N]T = int
+				Type* type1 = inferType_Exp(t, n->val.builtins.expression1);
+				Type* resolved_type1 = resolveType(t, type1);
+				if (resolved_type1->kind != k_NodeKindArrayType && resolved_type1->kind != k_NodeKindSliceType) {
+					fprintf(stderr, "Error: (line %d) The first expression in cap function call should be resolved to array or slice type.", n->lineno);
+					exit(1);
+				}
+				n->type = newIdType("int", 0)
+				return n->type;
+
+			case k_NodeKindFuncCall:// TODO: check func_type
+				Symbol* s = getSymbol(t, n->val.func_call.identifier->val.identifier);
+				Type* return_type = s->typelit.functiondec.returnType;
+				Exp* parameters = n->val.func_call.expressions_opt;
+				if (parameter == NULL) {	// Function with no params.
+
+				}
+				parameters = parameters->val.expressions.expressions;
+				while(parameters!=NULL){
+					parameters->val.expressions.expression
+					Type* inferred_type = inferType_Exp(t, parameters->val.expression);
+					Type* target_type =
+				}
 		}
 	}
-	return ;
+	return NULL;
 }
 
+// Check if struct type contains a field called id.
+// Retrun id type if found. Otherwise return NULL.
+Type* checkStructId(Type* n, Exp* id) {
+	if (n != NULL) {
+		switch (n->kind) {
+			case k_NodeKindStructType:
+				return checkStructId(n->val.identifier_type->identifier_type, id);
+			case k_NodeKindStructBody:
+				Exp* ids = n->val.struct_body->identifiers;
+				while(ids != NULL) {
+					if (strcmp(id->val.identifier, ids->val.identifiers.identifier->val.identifier) == 0) {
+						return n->val.struct_body.type;
+					}
+					ids = ids->val.identifiers.identifiers;
+				}
+				return checkStructId(n->val.struct_body->struct_body, id);
+			default:	// Won't reach this case.
+				return NULL;
+		}
+	} else {
+		return NULL;
+	}
+}
 
+// Find and return the underlying type 
+Type* resolveType(SymbolTable* t, Type* type) {
+	switch (type->kind) {
+		case k_NodeKindArrayType:
+		case k_NodeKindSliceType:	// Array & slice type doesn't resolve for inner.
+			return type;
+		case k_NodeKindIdType:
+			if (strcmp(type->val.identifier, "int") == 0
+					|| strcmp(type->val.identifier, "float64") == 0
+					|| strcmp(type->val.identifier, "rune") == 0
+					|| strcmp(type->val.identifier, "string") == 0) {
+				return type;
+			} else {
+				SYMBOL* s = getSymbol(t, type->val.identifier);
+				if (s->kind != symkind_type) {
+					printf("error");
+					exit(1);
+				}
+				return resolveType(t, s->typelit.type);
+			}
+		case k_NodeKindParType:
+			return resolveType(t, type->val.identifier_type.identifier_type);
+		case k_NodeKindStructType:	// Not sure.
+			return type;
+		case k_NodeKindStructBody:	// won't come here!
+			return type;
+	}
+} 
 
+// Check if the type is basic type
+bool isBasic(Type* type) {
+	return isInt(type) || isFloat64(type) || isBool(type) || isRune(type) || isString(type);
+}
 
+// Check if the type = float64
+bool isFloat64(Type* type) {
+	return compareType(type, newIdType("float64", 0));
+}
+
+// Check if the type = string
+bool isString(Type* type) {
+	return compareType(type, newIdType("string", 0));
+}
+
+// Check if the type = bool
+bool isBool(Type* type) {
+	return compareType(type, newIdType("bool", 0));
+}
+
+// Check if the type = int
+bool isInt(Type* type) {
+	return compareType(type, newIdType("int", 0));
+}
+
+// Check if the type = rune
+bool isRune(Type* type) {
+	return compareType(type, newIdType("rune", 0));
+}
+// Check if the type is numeric
+bool isNumeric(Type* type) {
+	return compareType(type, newIdType("int", 0)) || compareType(type, newIdType("float64", 0))
+			|| compareType(type, newIdType("rune", 0));
+}
+// Check if the type is integer
+bool isInteger(Type* type) {
+	return compareType(type, newIdType("int", 0)) || compareType(type, newIdType("rune", 0));
+}
+/*	TODO: not sure what is pointer???
+	comparable type: bool, int, float64, string, pointer, 
+					 struct(if all their fields are comparable), 
+					 array(if values of array element type are comparable)
+*/
+bool isComparable(Type* type) {
+	if (type == NULL) {
+		return true;
+	}
+	if (type->inferType == BoolType || type->inferType == IntType 
+		|| type->inferType == Float64Type
+		|| type->inferType == StringType) {
+		return true;
+	} else if (type->inferType == StructType) {
+		return isComparable(type->val.identifier_type.identifier_type);
+	} else if (type->inferType == ArrayType) {
+		return isComparable(type->val.identifier_type.identifier_type);
+	} else if (type->inferType == UnknownType && type->kind == k_NodeKindStructBody) {
+		return isComparable(type->val.struct_body.type) 
+			&& isComparable(type->val.struct_body.struct_body);
+	} else {
+		return false;
+	}
+}
+/*  ordered type: int, float64, string  */
+bool isOrdered(Type* type) {
+	return compareType(type, newIdType("int", 0)) || compareType(type, newIdType("float64", 0))
+				|| compareType(type, newIdType("string", 0));
+}
 
 

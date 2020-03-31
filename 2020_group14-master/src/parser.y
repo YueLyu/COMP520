@@ -361,7 +361,7 @@ identifier_type[root] //type identifiers. can be used in any condition, such as 
     
     | tIDENTIFIER[id]
         {
-            $root = newIdType($id, @id.first_line);
+            $root = newIdType($id, @id.first_line);	//k_NodeKindIdType
         }
     | tLEFT_PAR[left] identifier_type[p_root] tRIGHT_PAR
     	{
@@ -744,7 +744,7 @@ simple_statement[root]
         {
 			$root = newSimpleStatement($expr, NULL, k_NodeKindSimpleStatementDecrease, @expr.first_line);
         }
-    | primary_expression[left] tEQUAL expressions[right]
+    | primary_expressions[left] tEQUAL expressions[right]	// primary_expression is changed to primary_expressions
         {
 			$root = newSimpleStatement($left, $right, k_NodeKindSimpleStatementEqual, @left.first_line);
         }
@@ -825,7 +825,7 @@ expressions[root]
         }
     | expression[expr]
         {
-        	$root = newExpression($expr, @expr.first_line);
+        	$root = newExpressions(NULL, $expr, @expr.first_line);
         }
     ;
 
@@ -1051,6 +1051,18 @@ func_call[root]
         }*/
     ;
 
+primary_expressions[root]
+	: primary_expressions[exps] tCOMMA primary_expression[exp]
+        {
+			$root = newExpressionsPrimary($exps, $exp, @exps.first_line);
+        }
+    | primary_expression[exp]
+        {
+            $root = newExpressionsPrimary(NULL, $exp, @exps.first_line);
+        }
+    ;
+	
+
 /**
  * Expression decorators
  * Append syntax to an expression
@@ -1058,21 +1070,24 @@ func_call[root]
 primary_expression[root]
     : primary_expression selector[id_selector]
         {
-			$root=newExpressionPrimary($1,$id_selector,NULL,NULL,@id_selector.first_line);
+			$root=newExpressionPrimary($1,$id_selector,NULL,NULL,NULL,@id_selector.first_line);
         }
     | primary_expression index[i]
         {
-			$root=newExpressionPrimary($1,NULL,$i,NULL,@i.first_line);
+			$root=newExpressionPrimary($1,NULL,$i,NULL,NULL,@i.first_line);
         }
     | func_call[f]
     	{
-    $root=newExpressionPrimary(NULL,NULL,NULL,$f,@f.first_line);
+    $root=newExpressionPrimary(NULL,NULL,NULL,NULL,$f,@f.first_line);
         }
     | tIDENTIFIER[id]
         {
-    $root=newExpressionPrimary(NULL,NULL,NULL,newIdentifier($id,@id.first_line),@id.first_line);
+    $root=newExpressionPrimary(NULL,NULL,NULL,NULL,newIdentifier($id,@id.first_line),@id.first_line);
         }
-    
+	| identifier_type[type] tLEFT_PAR expression tRIGHT_PAR // type cast
+		{
+			$root=newExpressionPrimary(NULL,NULL,NULL,$type,$3, @type.first_line);
+        }
     ;
 
 /**

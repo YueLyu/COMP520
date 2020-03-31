@@ -311,12 +311,20 @@ Exp *newStringLiteral(char* literal, int lineno){
 	return n;
 }
 
-Exp *newExpressionPrimary(Exp *primary_expression, Exp *selector, Exp *index, Exp *expression, int lineno){
+Exp *newExpressionPrimary(Exp *primary_expression, Exp *selector, Exp *index, Type* identifier_type, Exp *expression, int lineno){
 	Exp *n = newExp(k_NodeKindExpressionPrimary, lineno); 
 	n->val.primary_expression.primary_expression = primary_expression;
 	n->val.primary_expression.selector = selector;
 	n->val.primary_expression.index = index;
+	n->val.primary_expression.identifier_type = identifier_type;
 	n->val.primary_expression.expression = expression;
+	return n;
+}
+
+Exp *newExpressionsPrimary(Exp *primary_expressions, Exp *primary_expression, int lineno){
+	Exp *n = newExp(k_NodeKindExpressionsPrimary, lineno);
+	n->val.primary_expressions.primary_expressions = primary_expressions;
+	n->val.primary_expressions.primary_expression = primary_expression;
 	return n;
 }
 

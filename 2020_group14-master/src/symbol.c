@@ -44,6 +44,15 @@ SYMBOL * makeSymbol_base(char* name, Type * type) {
 	return s;
 }
 
+SYMBOL * makeSymbol_definedType(char * name, Type * type, int lineno) {
+	SYMBOL * s = malloc(sizeof(SYMBOL));
+	s->kind = symkind_definedType;
+	s->name = name;
+	s->typelit.type = type;
+	s->lineno = lineno;
+	return s;
+}
+
 SYMBOL * makeSymbol_type(char * name, Type * type, int lineno) {
 	SYMBOL * s = malloc(sizeof(SYMBOL));
 	s->kind = symkind_type;
@@ -110,6 +119,9 @@ SYMBOLLIST * makeSymbolList(SymbolTable* t, Decl *funcParams) {
 	return head;
 }
 
+TYPELIST * makeTypeList(SYMBOLLIST * params) {
+
+}
 
 //Symbol table related functions.
 int Hash(char *str){		// hash function
@@ -254,6 +266,7 @@ void symDecl(Decl *n, SymbolTable* cur){
 							exit(1);
 					}
 					pos = 0;
+					temp_id = n->val.var_def.identifiers;
 					while (temp_id != NULL) {
 						SYMBOL* s = makeSymbol_var(temp_id->val.identifiers.identifier->val.identifier, arr[pos], n->lineno);
 						putSymbol(cur, s);
@@ -277,6 +290,11 @@ void symDecl(Decl *n, SymbolTable* cur){
 						temp_exp = temp_exp->val.expressions.expressions;
 						pos ++;
 					}
+					}
+					if (len != pos) {
+						fprintf(stderr, "Error: (line %d) The number of expressions and the number of variables don't match.\n", n->lineno);
+							exit(1);
+					}
 					for (int i = 0; i < len; i ++) {
 						if (!compareType(arr[i], type)) {
 							fprintf(stderr, "Error: (line %d) The types of expressions in the variable declaration doesn't match.\n", n->lineno);
@@ -284,7 +302,7 @@ void symDecl(Decl *n, SymbolTable* cur){
 						}
 					}
 					Exp* temp_id = n->val.var_def.identifiers;
-					while (temp_id != NULL) {
+					while (temp_id != NULL) {//didn't check num of exp = num of id;
 						SYMBOL* s = makeSymbol_var(temp_id->val.identifiers.identifier->val.identifier, arr[0], n->lineno);
 						putSymbol(cur, s);
 						temp_id = temp_id->val.identifiers.identifiers;
@@ -307,7 +325,7 @@ void symDecl(Decl *n, SymbolTable* cur){
 		    	symDecl(n->val.type_defs.type_defs, cur);
 		    	symDecl(n->val.type_defs.type_def, cur);
 				break;
-		    case k_NodeKindFuncDec:
+		    //case k_NodeKindFuncDec:
 		    case k_NodeKindTypeDef:
 		    	//type check type definition
 		    	;
@@ -324,7 +342,12 @@ void symDecl(Decl *n, SymbolTable* cur){
 		    	}
 		    	if(n->val.func_dec.func_type->val.func_type.identifier_type!=NULL){
 		    		checkType(cur, n->val.func_dec.func_type->val.func_type.identifier_type);
-		    	}
+				//update return type
+				cur_return_type = n->val.func_dec.func_type->val.func_type.identifier_type;
+		    	}else{
+				cur_return_type=NULL;
+			}
+
 		    	SYMBOLLIST* paramList = makeSymbolList(n->val.func_dec.func_params);
 		    	if (n->val.func_dec.func_type == NULL) {
 		    		putSymbol(cur, makeSymbol_function(n->val.func_dec.identifier->val.identifier, paramList, NULL, n->lineno));
@@ -332,10 +355,10 @@ void symDecl(Decl *n, SymbolTable* cur){
 		    		putSymbol(cur, makeSymbol_function(n->val.func_dec.identifier->val.identifier, paramList, n->val.func_dec.func_type->val.func_type.identifier_type, n->lineno));
 		    	}
 				
-				if (n->val.func_dec.block_body != NULL) {
-					symStmt(n->val.func_dec.block_body, cur, paramList);
-				}
-				break;
+			if (n->val.func_dec.block_body != NULL) {
+				symStmt(n->val.func_dec.block_body, cur, paramList);
+			}
+			break;
 		    case k_NodeKindFuncParams:
 		    case k_NodeKindFuncType:
 				break;
@@ -343,20 +366,22 @@ void symDecl(Decl *n, SymbolTable* cur){
     }
 }
 
-void checkType(SymbolTable* t, Type* n){
+void checkType(SymbolTable* t, Type* n){	// check if the type is defined.
 	if (n!=NULL){
 		switch (n->kind){
 			case k_NodeKindArrayType:
 			case k_NodeKindSliceType:
 			case k_NodeKindParType:
 			case k_NodeKindStructType:
-				checkType(t, n->val.identifier_type.identifier_type);
+				checkType(t, n->val.identifier_type.identifier_type);//[]  check emptyness: slice type with empty type identifier identifier_type is NULL
 				break;
 			case k_NodeKindIdType:
-				getSymbol(t, n->val.identifier);
+				getSymbol(t, n->val.identifier);//[]??? check undefined: slice type with undefined type identifier will trigger error in getSymbol()
 				break;
 			case k_NodeKindStructBody:
-				checkType(t, n->val.struct_body.struct_body);
+				if(n->val.struct_body.struct_body!=NULL){
+					checkType(t, n->val.struct_body.struct_body);
+				}
 				checkType(t, n->val.struct_body.type);
 				break;
 		}
@@ -377,7 +402,7 @@ void symStmt(Stmt *n, SymbolTable* cur, SYMBOLLIST *paramList){
 			case k_NodeKindStatement:
 				symStmt(n->val.statement.stmt,cur, NULL);
 				break;
-			case k_NodeKindStatementDec:
+			case k_NodeKindStatementDec:	// typeDec, varDec
 				symDecl(n->val.statement_dec.decl,cur);
 				break;
 			case k_NodeKindBlockBody:
@@ -398,13 +423,72 @@ void symStmt(Stmt *n, SymbolTable* cur, SYMBOLLIST *paramList){
 			case k_NodeKindSimpleStatementDec:
 				symStmt(n->val.simple_statement_dec.statement,cur, NULL);
 				break;
-			case k_NodeKindSimpleStatementExp:
-				symExp(n->val.simple_statement.lhs,cur);
+			case k_NodeKindSimpleStatementExp:  //use inferType_Exp instead of symExp: 1. symExp never updates the symbol table  2. if the type of the expression can be infered, then the identifiers in this expression must already exist in the symbol table
+				if(n->val.simple_statement.lhs->kind!=k_NodeKindFuncCall){	// Weeding out illegal expression statements.
+					fprintf(stderr, "Error: (line %d)  In GoLite, only function call expressions are allowed to be used as statements.\n", n->lineno);
+					exit(1);
+				}
+				inferType_Exp(cur,n->val.simple_statement.lhs);
 				break;
-			//TODO:
-			case k_NodeKindSimpleStatementInc:
-			case k_NodeKindSimpleStatementDecrease:
-			case k_NodeKindSimpleStatementEqual:
+
+			case k_NodeKindSimpleStatementInc: //TODO:
+			{
+				Type *varType=inferType_Exp(n->val.simple_statement.lhs);
+				if(isNumeric(varType)==false){
+					fprintf(stderr, "Error: (line %d)  Variable of increment statement is not numeric.\n", n->lineno);
+					exit(1);
+				}
+				break;
+			}
+			case k_NodeKindSimpleStatementDecrease: //TODO:
+			{
+				Type *varType=inferType_Exp(n->val.simple_statement.lhs);
+				if(isNumeric(varType)==false){
+					fprintf(stderr, "Error: (line %d)  Variable of decrement statement is not numeric.\n", n->lineno);
+					exit(1);
+				}
+				break;
+			}
+
+			case k_NodeKindSimpleStatementEqual: // assignment
+				{
+					;
+					int idListLength=0;
+					Exp *ids=n->val.simple_statement.lhs;
+					while(ids!=NULL){
+						idListlength++;
+						ids=ids->val.primary_expressions.primary_expressions;
+					}
+					Type *idList[idListlength];
+					ids=n->val.simple_statement.lhs;
+					for(int i=0;i<idListlength;i++){
+						idList[i]=inferType_Exp(ids->val.primary_expressions.primary_expression);
+						ids=ids->val.primary_expressions.primary_expressions;
+					}
+					int expListLength=0;
+					Exp *exps=n->val.simple_statement.rhs;
+					while(exps!=NULL){
+						expListLength++;
+						exps=exps->val.expressions.expressions;
+					}
+					if(idListlength!=expListLength){
+						fprintf(stderr, "Error: (line %d)  The number of identifiers doesn't match the number of expressions.\n", n->lineno);
+						exit(1);
+					}
+					Type *expList[idListlength];
+					exps=n->val.simple_statement.rhs;
+					for(int i=0;i<expsListlength;i++){
+						expList[i]=inferType_Exp(exps->val.expressions.expression);
+						exps=exps->val.expressions.expressions;
+					}
+					for(int i=0;i<idListlength;i++){
+						if(!compareType(idList[i],expList[i])){
+							fprintf(stderr, "Error: (line %d)  The type of identifier doesn't match the type of expression.\n", n->lineno);
+							exit(1);
+						}
+					}
+					break;
+				}
 			case k_NodeKindSimpleStatementPlusEqual:
 			case k_NodeKindSimpleStatementMinEqual:
 			case k_NodeKindSimpleStatementMulEqual:
@@ -416,49 +500,241 @@ void symStmt(Stmt *n, SymbolTable* cur, SYMBOLLIST *paramList){
 			case k_NodeKindSimpleStatementLeftShiftEqual:
 			case k_NodeKindSimpleStatementRightShiftEqual:
 			case k_NodeKindSimpleStatementBitClearEqual:
-				symExp(n->val.simple_statement.lhs,cur);
-				if(n->val.simple_statement.rhs!=NULL){symExp(n->val.simple_statement.rhs,cur);}
+			{
+				Exp *exp_lhs = inferType_Exp(n->val.simple_statement.lhs);
+				Exp *exp_rhs = inferType_Exp(n->val.simple_statement.rhs);
+				if(!compareType(exp_lhs, exp_rhs)){
+						fprintf(stderr, "Error: (line %d)  The left hand side variables don't have the same types as the right hand side expressions.\n", n->lineno);
+						exit(1);
+					}
+				}
+				n->type = exp_lhs;
 				break;
+			}
 			case k_NodeKindSimpleStatementDeclEqual:
-				//short hand declarations
-			
+				{
+					;
+					//short hand declarations
+					int idListlength=0;
+					Exp *ids=n->val.simple_statement.lhs;
+					while(ids!=NULL){//every identifiers that is not null has an identifier and an identifiers
+						idListlength++;
+						ids=ids->val.identifiers.identifiers;
+					}
+					Exp *idList[idListlength];
+					ids=n->val.simple_statement.lhs;
+					for(int i=0;i<idListlength;i++){
+						idList[i]=ids->val.identifiers.identifer;
+						ids=ids->val.identifiers.identifiers;
+					}
+					bool existsUndeclaredVar=false;
+					for(int i=0;i<idListlength;i++){
+						char *id=idList[i]->val.identifier;
+						if(checkSymbolExists(cur,id)==NULL){
+							existsUndeclaredVar=true;
+						}
+					}
+					if(existsUndeclaredVar=false){
+						fprintf(stderr, "Error: (line %d)  All identifiers on the left hand side have been declared.\n", n->lineno);
+						exit(1);
+					}
+					int expListLength=0;
+					Exp *exps=n->val.simple_statement.rhs;
+					while(exps!=NULL){
+						expListLength++;
+						exps=exps->val.expressions.expressions;
+					}
+					if(idListLength!=expListLength){
+						fprintf(stderr, "Error: (line %d)  The number of dentifiers doesn't match the number of expressions.\n", n->lineno);
+						exit(1);
+					}
+					Type *expList[expListLength];
+					exps=n->val.simple_statement.rhs;
+					for(int i=0;i<expListlength;i++){
+						expList[i]=inferType_Exp(exps->val.expressions.expression);
+						exps=exps->val.expressions.expressions;
+					}
+					/*for(int i=0;i<expListLength;i++){
+						if(compareType(expList[i],expList[i+1])==false){
+							fprintf(stderr, "Error: (line %d) The types of expressions in the short declaration doesn't match.\n", n->lineno);
+							exit(1);
+						}
+					}*/
+					Type *expsType=expList[0];
+					bool allIdsNotDeclared=true;
+					for(int i=0;i<idListlength;i++){
+						char *id=idList[i]->val.identifier;
+						if(checkSymbolExists(cur,id)!=NULL){
+							allIdsNotDeclared=false;
+							break;
+						}
+					}
+					if(allIdsNotDeclared==true){//if none of the identifiers has been decalred(none of the identifiers has a type)
+						for(int i=0;i<idListlength;i++){
+							char *id=idList[i]->val.identifier;
+							SYMBOL *s=makeSymbol_var(id,expsType,n->lineno);
+							putSymbol(cur,s);
+							}
+						}
+					}else{//if some of the identifiers has been decalred
+						for(int i=0;i<idListlength;i++){
+							char *id=idList[i]->val.identifier;
+							if(checkSymbolExists(cur,id)==NULL){//for the undeclared identifiers
+								SYMBOL *s=makeSymbol_var(id,expsType,n->lineno);
+								putSymbol(cur,s);
+							}else{//for the declared identifiers
+								Type *idType=getSymbol(cur,id)->typelit.type;
+								if(idType!=expsType){
+									fprintf(stderr, "Error: (line %d) The types of identifier doesn't match the type of expressions.\n", n->lineno);
+									exit(1);
+								}else{
+									SYMBOL *s=makeSymbol_var(id,expsType,n->lineno);
+									putSymbol(cur,s);
+								}
+							}
+						}
+					}
+					break;
+				}
+
 			case k_NodeKindPrintDec:
-				symExp(n->val.print_dec.expression_opt,cur);
-				break;
 			case k_NodeKindPrintlnDec:
-				symExp(n->val.print_dec.expression_opt,cur);
+			{
+				Exp *exps=n->val.print_dec.expressions_opt->val.expressions;
+				while(exps!=NULL){
+					Type *expType=inferType_Exp(exps.expression);
+					if(isBool(expType)==false&&isString(expType)==false&&isNumeric(expType)==false){
+						fprintf(stderr, "Error: (line %d)  The printed expression is not one of the basic types.\n", n->lineno);
+						exit(1);
+					}
+				}
 				break;
+			}
 			
 			case k_NodeKindReturn:
-				symExp(n->val.return_dec.expressions_opt,cur);
+				if(cur_return_type==NULL&&n->val.return_dec.expression_opt!=NULL){//the field of return_dec should be expression_opt instead of expressions_opt
+				fprintf(stderr, "Error: (line %d)  The return type of the function is void, but an expression is returned.\n", n->lineno);
+				exit(1);
+				}else if(cur_return_type==NULL&&n->val.return_dec.expression_opt==NULL){
 				break;
+				}else if(cur_return_type!=NULL&&n->val.return_dec.expression_opt==NULL){
+				fprintf(stderr, "Error: (line %d)  The return type of the function is not void, but an nothing is returned.\n", n->lineno);
+				exit(1);
+				}else{
+					Type *returnType=inferType_Exp(n->val.return_dec.expressions_opt,cur);
+					if(compareType(cur_return_type,returnType)==false){
+						fprintf(stderr, "Error: (line %d)  The type of the returned expression does not match the type of the funciton.\n", n->lineno);
+						exit(1);
+					}else{
+						break;
+					}
+				}
 			
 			case k_NodeKindIfStmt:
-				symStmt(n->val.if_stmt.simple_statement_dec,cur, NULL);
-				symExp(n->val.if_stmt.expression,cur);
-				symStmt(n->val.if_stmt.block_body,cur, NULL);
-				symStmt(n->val.if_stmt.else_stmt,cur, NULL);
+			{
+				if(n->val.if_stmt.simple_statement_dec!=NULL){
+					SymbolTable *child=scopeSymbolTable(cur);
+					symStmt(n->val.if_stmt.simple_statement_dec,child,NULL);
+					Type *expType=inferType_Exp(n->val.if_stmt.expression);
+					if(isBool(expType)==false){
+						fprintf(stderr, "Error: (line %d)  if condition is not of type bool.\n", n->lineno);
+						exit(1);
+					}
+					symStmt(n->val.if_stmt.block_body,child,NULL);
+					symStmt(n->val.if_stmt.else_stmt,child,NULL);
+					cur=unscopeSymbolTable(child);
+				}else{
+					Type *expType=inferType_Exp(n->val.if_stmt.expression);
+					if(isBool(expType)==false){
+						fprintf(stderr, "Error: (line %d)  if condition is not of type bool.\n", n->lineno);
+						exit(1);
+					}
+					symStmt(n->val.if_stmt.block_body,child,NULL);
+					symStmt(n->val.if_stmt.else_stmt,child,NULL);
+					}
 				break;
+			}
 			case k_NodeKindElseStmt:
 				symStmt(n->val.else_stmt.if_stmt,cur, NULL);
 				symStmt(n->val.else_stmt.block_body,cur, NULL);
 				break;
 			case k_NodeKindForDec:
-				symStmt(n->val.for_dec.for_condition,cur, NULL);
-				symStmt(n->val.for_dec.block_body,cur, NULL);
+			{
+				if(n->val.for_dec.for_condition->val.for_condition.left!=NULL){
+					SymbolTable *child=scopeSymbolTable(cur);
+					symStmt(n->val.for_dec.for_condition->val.for_condition.left,child, NULL);//put variables declared in for loop's init into an independent intermediate symbol table
+
+					symStmt(n->val.for_dec.for_condition,child, NULL);//According to specification, declarations in init can shadow declarations in for loop's scope
+
+					symStmt(n->val.for_dec.block_body,child, NULL);//then traverse the for loop's body with the init's declarations
+					cur=unscopeSymbolTable(child);
+				}
+				else{
+					symStmt(n->val.for_dec.for_condition,cur, NULL);
+					symStmt(n->val.for_dec.block_body,cur, NULL);
+				}
 				break;
+			}
 			case k_NodeKindForCondition:
-				symStmt(n->val.for_condition.left,cur, NULL);
-				symExp(n->val.for_condition.expression,cur);
-				symStmt(n->val.for_condition.right,cur, NULL);
-				break;
+			{
+				Stmt *cond=n->val.for_condition;
+				if(cond.left!=NULL&&cond.expression!=NULL&&cond.right!=NULL){
+					symStmt(cond.left);
+					Type *expType=inferType_Exp(cond.expression);
+					if(isBool(expType)==false){
+						fprintf(stderr, "Error: (line %d)  for condition is not of type bool.\n", n->lineno);
+						exit(1);
+					}
+					symStmt(cond.right);
+				}else if(cond.expression!=NULL){
+					Type *expType=inferType_Exp(cond.expression);
+					if(isBool(expType)==false){
+						fprintf(stderr, "Error: (line %d)  for condition is not of type bool.\n", n->lineno);
+						exit(1);
+					}
+				}else{
+					break;
+				}
+			}
 			case k_NodeKindSwitchDec:
+				if(n->val.switch_dec.switch_def->val.switch_def.simple_statement!=NULL){
+					SymbolTable *child=scopeSymbolTable(cur);
+					symStmt(n->val.switch_dec.switch_def->val.switch_def.simple_statement,child,NULL)
+					if(n->val.switch_dec.switch_def->val.switch_def.expression_opt!=NULL){//switch_def has both exp and stmt
+						symExp(n->val.switch_def.expression_opt,child,NULL);
+						symStmt(n->val.switch_dec.switch_cases,child,NULL);
+					}else{//switch_def only has stmt
+						Stmt *temp=n->val.switch_dec.switch_cases;
+						while(temp!=NULL){
+							if(isBool(temp->val.switch_cases.expression)==false){
+								fprintf(stderr, "Error: (line %d)  Case expression is not bool while switching without expression.\n", n->lineno);
+								exit(1);
+							}
+							symStmt(temp->val.switch_cases.statements,child,NULL);
+							temp=temp->val.switch_cases.switch_cases;
+						}
+					}
+					cur=unscopeSymbolTable(child);
+				}else{//switch_def has only exp
+					if(n->val.switch_dec.switch_def->val.switch_def.expression_opt!=NULL){//switch_def has both exp and stmt
+						symExp(n->val.switch_def.expression_opt,cur,NULL);
+						symStmt(n->val.switch_dec.switch_cases,cur,NULL);
+					}else{//switch_def is empty
+						Stmt *temp=n->val.switch_dec.switch_cases;
+						while(temp!=NULL){
+							if(isBool(temp->val.switch_cases.expression)==false){
+							fprintf(stderr, "Error: (line %d)  Case expression is not bool while switching without expression.\n", n->lineno);
+							exit(1);
+							}
+							symStmt(temp->val.switch_cases.statements,cur,NULL);
+							temp=temp->val.switch_cases.switch_cases;
+						}
+					}
+				}
 				symStmt(n->val.switch_dec.switch_def,cur, NULL);
 				symStmt(n->val.switch_dec.switch_cases,cur, NULL);
 				break;
 			case k_NodeKindSwitchDef:
-				symStmt(n->val.switch_def.simple_statement,cur, NULL);
-				symExp(n->val.switch_def.expression_opt,cur);
 				break;
 			case k_NodeKindDefault:
 			case k_NodeKindSwitchCases:
@@ -472,87 +748,6 @@ void symStmt(Stmt *n, SymbolTable* cur, SYMBOLLIST *paramList){
 					break;
 			}
 		}
-}
-
-
-void symExp(Exp *n, SymbolTable* cur){
-	if (n != NULL){
-		switch (n->kind) {
-			case k_NodeKindIdentifiers:
-				symExp(n->val.identifiers.identifiers,cur);
-				symExp(n->val.identifiers.identifier,cur);
-				break;
-			case k_NodeKindIdentifier:
-				getSymbol(cur,n->val.identifier);
-				break;
-			case k_NodeKindExpressionsOpt:
-			case k_NodeKindExpressions:
-				symExp(n->val.expressions.expressions,cur);
-				symExp(n->val.expressions.expression,cur);
-				break;
-			case k_NodeKindExpressionOpt:
-			case k_NodeKindExpression:
-				symExp(n->val.expression.expression,cur);
-				break;
-			
-			case k_NodeKindExpressionBinaryPlus:
-			case k_NodeKindExpressionBinaryMinus:
-			case k_NodeKindExpressionBinaryMultiply:
-			case k_NodeKindExpressionBinaryDivide:
-			case k_NodeKindExpressionBinaryModulo:
-			case k_NodeKindExpressionBinaryBitAnd:
-			case k_NodeKindExpressionBinaryBitOr:
-			case k_NodeKindExpressionBinaryBitXor:
-			case k_NodeKindExpressionBinarybitClear:
-			case k_NodeKindExpressionBinaryLeftShift:
-			case k_NodeKindExpressionBinaryRightShift:
-			case k_NodeKindExpressionBinaryIsEqual:
-			case k_NodeKindExpressionBinaryIsNotEqual:
-			case k_NodeKindExpressionBinaryLessThan:
-			case k_NodeKindExpressionBinaryGreaterThan:
-			case k_NodeKindExpressionBinaryLessThanEqual:
-			case k_NodeKindExpressionBinaryGreaterThanEqual:
-			case k_NodeKindExpressionBinaryAnd:
-			case k_NodeKindExpressionBinaryOr:
-				symExp(n->val.binary.lhs,cur);
-				symExp(n->val.binary.rhs,cur);
-				break;
-			case k_NodeKindUMinus:
-			case k_NodeKindUPlus:
-			case k_NodeKindUNot:
-			case k_NodeKindUXor:
-				symExp(n->val.unary.operand,cur);
-				break;
-			
-			case k_NodeKindIntLiteral:
-			case k_NodeKindRuneLiteral:
-			case k_NodeKindFloatLiteral:
-			case k_NodeKindStringLiteral:
-				break;
-			
-			case k_NodeKindExpressionPrimary:
-				symExp(n->val.primary_expression.primary_expression,cur);
-				symExp(n->val.primary_expression.selector,cur);
-				symExp(n->val.primary_expression.index,cur);
-				symExp(n->val.primary_expression.expression,cur);
-			case k_NodeKindSelector:
-				break;
-			case k_NodeKindIndex:
-				symExp(n->val.index.expression,cur);
-				break;
-			case k_NodeKindAppend:
-			case k_NodeKindLen:
-			case k_NodeKindCap:
-				symExp(n->val.builtins.expression1,cur);
-				symExp(n->val.builtins.expression2,cur);
-				break;
-			case k_NodeKindFuncCall:
-				symExp(n->val.func_call.identifier,cur);
-				symExp(n->val.func_call.expressions_opt,cur);
-				break;
-		
-		}
-	}
 }
 
 void indent(int x) {

@@ -99,6 +99,20 @@ typedef enum{
 }TypeKind;
 
 typedef enum{
+	//id type
+	ArrayType,
+	SliceType,
+	IdType,
+	StructType,
+	IntType,
+	Float64Type,
+	RuneType,
+	StringType,
+	BoolType,
+	UnknownType,
+}ExpressionType;
+
+typedef enum{
 	//identifiers
 	k_NodeKindIdentifiers,
 	k_NodeKindIdentifier,
@@ -139,6 +153,7 @@ typedef enum{
 	k_NodeKindStringLiteral,
 	
 	k_NodeKindExpressionPrimary,
+	k_NodeKindExpressionsPrimary,
 	k_NodeKindSelector,
 	k_NodeKindIndex,
 	
@@ -185,7 +200,9 @@ struct Type{
 	//SYMBOL *symbol;
 	//SymbolType type;
     //typeData evalValue;
-    TypeKind kind;
+	TypeKind kind;
+    //ExpressionType inferType;
+	//ExpressionType underlyingType;
     union{
     	char *identifier;
     	struct { int size; Type *identifier_type;}identifier_type;
@@ -196,6 +213,7 @@ struct Type{
 
 struct Stmt{
 	SYMBOL* sym;
+	Type* type;
 	int lineno;
 	//SYMBOL *symbol;
 	//SymbolType type;
@@ -209,8 +227,8 @@ struct Stmt{
 		struct { Stmt *statements;}block_body;
 		struct { Stmt *statement;}simple_statement_dec;
 		struct { Exp *lhs; Exp *rhs;}simple_statement;
-		struct { Exp *expression_opt;}print_dec;
-		struct { Exp *expressions_opt;}return_dec;
+		struct { Exp *expressions_opt;}print_dec;
+		struct { Exp *expression_opt;}return_dec;
 		struct { Stmt *simple_statement_dec; Exp *expression; Stmt *block_body; Stmt *else_stmt;}if_stmt;
 		struct { Stmt *if_stmt; Stmt *block_body;}else_stmt;
 		struct { Stmt *for_condition; Stmt *block_body;}for_dec;
@@ -224,6 +242,7 @@ struct Stmt{
 struct Exp{
 	SYMBOL* sym;
 	int lineno;
+	Type* type;
 	//SYMBOL *symbol;
 	//SymbolType type;
     //typeData evalValue;
@@ -238,7 +257,8 @@ struct Exp{
 		struct { Exp *expression;}expression;
 		struct { Exp *lhs; Exp *rhs;}binary;
 		struct { Exp *operand;}unary;
-		struct { Exp *primary_expression; Exp *selector; Exp *index; Exp *expression;}primary_expression;
+		struct { Exp *primary_expression; Exp *selector; Exp *index; Type* identifier_type; Exp *expression;}primary_expression;
+		struct { Exp *primary_expressions; Exp *primary_expression;}primary_expressions;	// new added
 		struct { Exp *identifier;}selector;
 		struct { Exp *expression;}index;
 		struct { Exp *expression1; Exp *expression2;}builtins;
@@ -252,11 +272,17 @@ enum SymbolKind {
 	symkind_var,
 	symkind_func,
 	symkind_type,
+	symkind_definedType,
 	symkind_const,
 	symkind_struct,
 	symkind_array,
 	symkind_slice,
 	symkind_base
+};
+
+struct TYPELIST {
+	Type* currType;
+	Type* next;
 };
 
 struct SYMBOLLIST {
