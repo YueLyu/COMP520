@@ -247,7 +247,7 @@ void symDecl(Decl *n, SymbolTable* cur){
     if (n != NULL){
 		switch (n->kind) {
 			case k_NodeKindPackageDec:
-				putSymbol(cur, makeSymbol_var(n->val.package_dec.identifier->val.identifier, NULL, n->lineno));
+				putSymbol(cur, makeSymbol_var(n->val.package_dec.identifier->val.identifier, newIdType("package", n->lineno), n->lineno));
 				break;		//TODO: Not sure!
 		    case k_NodeKindTopDecs:
 		    	symDecl(n->val.top_decs.top_decs, cur);
@@ -277,13 +277,7 @@ void symDecl(Decl *n, SymbolTable* cur){
 						temp_exp = temp_exp->val.expressions.expressions;
 						pos ++;
 					}
-					/*
-					for (int i = 0; i < len - 1; i ++) {
-						if (!compareType(arr[i], arr[i + 1])) {
-							fprintf(stderr, "Error: (line %d) The types of expressions in the variable declaration doesn't match.\n", n->lineno);
-							exit(1);
-						}
-					}*/
+
 					int len2 = 0;
 					Exp* temp_id = n->val.var_def.identifiers;
 					while (temp_id != NULL) {
@@ -362,23 +356,27 @@ void symDecl(Decl *n, SymbolTable* cur){
 		    	putSymbol(cur, makeSymbol_type(n->val.type_def.identifier->val.identifier, n->val.type_def.identifier_type, n->lineno));
 				break;
 		    case k_NodeKindFuncDec:
+		    	;
 		        //check for special functions
-		    	if(strcmp(n->val.func_dec.identifier->val.identifier, "main")==0||strcmp(n->val.func_dec.identifier->val.identifier, "main")==0){
+		    	if(strcmp(n->val.func_dec.identifier->val.identifier, "main")==0||strcmp(n->val.func_dec.identifier->val.identifier, "init")==0){
 					if(n->val.func_dec.func_type!=NULL||n->val.func_dec.func_params!=NULL){
 						fprintf(stderr, "Error: (line %d) funcion init or main should have no parameters nor return value.\n", n->lineno);
 						exit(1);
 					}
 		    	}
-		    	if(n->val.func_dec.func_type->val.func_type.identifier_type!=NULL){
+		    	if(n->val.func_dec.func_type != NULL){
 		    		checkType(cur, n->val.func_dec.func_type->val.func_type.identifier_type);
 		    		//update return type
 		    		cur_return_type = n->val.func_dec.func_type->val.func_type.identifier_type;
 		    	}else{
 		    		cur_return_type=NULL;
 		    	}
-
-		    	SYMBOLLIST* paramList = makeSymbolList(cur,n->val.func_dec.func_params);
-		    	TYPELIST* typeList = makeTypeList(paramList);
+		    	SYMBOLLIST* paramList=NULL;
+		    	TYPELIST* typeList=NULL;
+		    	if(n->val.func_dec.func_params!=NULL){
+		    		paramList = makeSymbolList(cur,n->val.func_dec.func_params);
+		    		typeList = makeTypeList(paramList);
+		    	}
 		    	if (n->val.func_dec.func_type == NULL) {
 		    		putSymbol(cur, makeSymbol_function(n->val.func_dec.identifier->val.identifier, typeList, NULL, n->lineno));
 		    	} else {
@@ -677,8 +675,8 @@ void symStmt(Stmt *n, SymbolTable* cur, SYMBOLLIST *paramList){
 						fprintf(stderr, "Error: (line %d)  if condition is not of type bool.\n", n->lineno);
 						exit(1);
 					}
-					symStmt(n->val.if_stmt.block_body,child,NULL);
-					symStmt(n->val.if_stmt.else_stmt,child,NULL);
+					symStmt(n->val.if_stmt.block_body,cur,NULL);
+					symStmt(n->val.if_stmt.else_stmt,cur,NULL);
 					}
 				break;
 			}
@@ -787,81 +785,6 @@ void indent(int x) {
 	}
 }
 
-char *getType(Type* n) {
-	if (n != NULL) {
-		switch (n->kind) {
-			case k_NodeKindArrayType:
-				printf("reach1");
-				char *secondHalf=getType(n->val.identifier_type.identifier_type); //the inner layers of the type
-				char *leftParen="[";
-				char length[10];
-				sprintf(length, "%d", n->val.identifier_type.size);
-				char *rightParen="]";
-				char *result1=(char *) malloc(sizeof(char) * (1 + strlen(length)+ strlen(leftParen)+ strlen(rightParen)+ strlen(secondHalf)));
-				strcpy(result1, leftParen); //[
-				strcat(result1,length); //[3
-				strcat(result1, rightParen); //[3]
-				strcat(result1, secondHalf); //[3]int, or [3][4]int
-				printf("type1: %s", result1);
-				return result1;
-			case k_NodeKindSliceType:
-				printf("reach2");
-				char *second=getType(n->val.identifier_type.identifier_type); //the inner layers of the type
-				char *leftPar="[";
-				char *rightPar="]";
-				char *result2=(char *) malloc(sizeof(char) * (1 + strlen(leftPar)+ strlen(rightPar)+ strlen(secondHalf)));
-				strcpy(result2, leftPar); 
-				strcat(result2, rightPar); 
-				strcat(result2, second); 
-				printf("type2: %s", result2);
-				return result2;
-			case k_NodeKindIdType:
-				printf("reach3\n");
-			    printf("%s",n->val.identifier);
-				char *result4 = (char *) malloc(sizeof(char) * (1+strlen(n->val.identifier)));
-				strcpy(result4, n->val.identifier);
-				printf("type4: %s", result4);
-				return result4;
-			case k_NodeKindStructType:
-				printf("reach4");
-				char* s = "struct {\n";
-				char* body = getType(n->val.identifier_type.identifier_type);
-				char* rightPar3 = "\n}\n";
-				char* result3 = (char *) malloc(sizeof(char) * (1 + strlen(s)+ strlen(body)+ strlen(rightPar3)));
-				strcpy(result3, s); 
-				strcat(result3, body); 
-				strcat(result3, rightPar3); 
-				printf("type3: %s", result3);
-				return result3;
-			case k_NodeKindParType:
-				printf("reach5");
-				printf("type5: %s", getType(n->val.identifier_type.identifier_type));
-				return getType(n->val.identifier_type.identifier_type);
-			case k_NodeKindStructBody:
-				printf("reach6");
-				char* first_half = getType(n->val.struct_body.struct_body);
-				char* second_half = getType(n->val.struct_body.type);
-				char* id = (char *)malloc(sizeof(char) * (1+strlen(first_half)+strlen(second_half)));
-				Exp* temp = n->val.struct_body.identifiers;
-				while (temp != NULL) {
-					char* cur = temp->val.identifiers.identifier->val.identifier;
-					char *buffer=(char *)malloc(sizeof(char) * (1+strlen(id)+strlen(cur)));
-					strcpy(buffer, cur);
-					strcat(buffer,id);
-					id = buffer;
-					temp = temp->val.identifiers.identifiers;
-				}
-				char *finalResult=(char *)malloc(sizeof(char) * (1+strlen(first_half)+strlen(id)+strlen(second_half)));
-				strcpy(finalResult,first_half);
-				strcat(finalResult, id);
-				strcat(finalResult, second_half);
-				printf("type6: %s", finalResult);
-				return finalResult;
-	  	}
-	
-	}
-}
-
 void printType(Type* n) {
 	if (n != NULL) {
 		switch (n->kind) {
@@ -881,8 +804,11 @@ void printType(Type* n) {
 			    break;
 			case k_NodeKindStructType:
 				printf("struct {\n");
+				scope ++;
 				printType(n->val.identifier_type.identifier_type);
-				printf("\n}\n");
+				scope --;
+				indent(scope);
+				printf("}\n");
 				break;
 			case k_NodeKindParType:
 				printType(n->val.identifier_type.identifier_type);
@@ -896,13 +822,19 @@ void printType(Type* n) {
 					char* cur = temp->val.identifiers.identifier->val.identifier;
 					char buffer [100];
 					strcpy(buffer, cur);
+					if (strcmp(id, "") != 0) {
+						strcat(buffer, ", ");
+					}
 					strcat(buffer,id);
 					id = buffer;
 					temp = temp->val.identifiers.identifiers;
 				}
 				
+				indent(scope);
 				printf("%s", id);
+				printf(" ");
 				printType(n->val.struct_body.type);
+				printf("\n");
 				break;
 	  	}
 	
@@ -920,7 +852,7 @@ void printSymTable(SymbolTable* t){		// Print symbolTable tree
 		        	indent(scope);
 		            printf("%s ", s->name);
 					if (s->typelit.type != NULL) {
-						//printType(s->typelit.type);
+						printType(s->typelit.type);
 						//getType(s->typelit.type);
 						//char* str = getType(s->typelit.type);
 						//printf("%c", str[0]);

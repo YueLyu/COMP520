@@ -8,54 +8,64 @@
 
 
 bool compareType(Type* a, Type* b) {//A very good method
+	//printf("comparetype\n");
 	if (a == NULL && b == NULL) {
+		//fprintf(stdout, "1");
 		return true;
 	}
 	if ((a == NULL && b != NULL) || (a != NULL && b == NULL)) {
+		//fprintf(stdout, "2");
 		return false;
 	}
 	if(a->kind!=b->kind){
+		//fprintf(stdout, "3");
 		return false;
 	}
-	
+	//printf("comparetype2\n");
 	switch(a->kind){
-		k_NodeKindArrayType:
+		case k_NodeKindArrayType:
 			if(a->val.identifier_type.size!=b->val.identifier_type.size){
+				//fprintf(stdout, "4");
 				return false;
 			}else{
 				return compareType(a->val.identifier_type.identifier_type,b->val.identifier_type.identifier_type);
 			}
 			
-		k_NodeKindParType:
-		k_NodeKindSliceType:
+		case k_NodeKindParType:
+		case k_NodeKindSliceType:
 			return compareType(a->val.identifier_type.identifier_type,b->val.identifier_type.identifier_type);
 			
-		k_NodeKindIdType:
+		case k_NodeKindIdType:
 			if(strcmp(a->val.identifier,b->val.identifier)==0){
+				//fprintf(stdout, "5");
 				return true;
 			} else{
+				//fprintf(stdout, "6");
 				return false;
 			}
 			
-		k_NodeKindStructType:
+		case k_NodeKindStructType:
 			;
 			Type *aBody=a->val.identifier_type.identifier_type;
 			Type *bBody=b->val.identifier_type.identifier_type;
 			return compareType(aBody,bBody);
 				
-		k_NodeKindStructBody:
+		case k_NodeKindStructBody:
 			;
 			Exp *aFieldNames=a->val.struct_body.identifiers;
 			Exp *bFieldNames=b->val.struct_body.identifiers;
 			Type *aFieldType=a->val.struct_body.type;
 			Type *bFieldType=b->val.struct_body.type;
 			if(!compareIdList(aFieldNames,bFieldNames)){
+				//fprintf(stdout, "7");
 				return false;
 			} else if(!compareType(aFieldType,bFieldType)){
+				//fprintf(stdout, "8");
 				return false;
 			} else{
 				return compareType(a->val.struct_body.struct_body,b->val.struct_body.struct_body);
 			}
+
 		}
 
 }
@@ -259,10 +269,11 @@ Type *inferType_Exp(SymbolTable* t, Exp* n){//TODO:
 			}
 
 			/* ----------------------------- Primary Expressions: -------------------------------*/
+			/*
 			case k_NodeKindExpressionsPrimary:	// TODO: Won't reach this case
 			{
 				break;
-			}
+			}*/
 				
 			case k_NodeKindExpressionPrimary:
 			{

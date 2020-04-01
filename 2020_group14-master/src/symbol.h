@@ -5,7 +5,6 @@
 #include "type.h"
 
 
-
 // Make symbol related functions.
 SYMBOL * makeSymbol_var(char * name, Type * type, int lineno);
 SYMBOL * makeSymbol_const(char * name, Type * type);
@@ -39,7 +38,6 @@ void symStmt(Stmt *n, SymbolTable* cur, SYMBOLLIST *paramList);
 
 void indent(int x);
 
-char *getType(Type* n);
 void printType(Type* n);
 
 void printSymTable(SymbolTable* t);
